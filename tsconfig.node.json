@@ -1,0 +1,8 @@
+{
+  "extends": "@total-typescript/tsconfig/bundler/no-dom/app",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts"]
+}
