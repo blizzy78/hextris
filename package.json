@@ -12,6 +12,7 @@
     "watch-routes": "tsr watch"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.2.8",
     "@tanstack/react-router": "1.139.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
