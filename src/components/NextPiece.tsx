@@ -2,6 +2,7 @@
 
 import { getPieceCoordinates } from '@/game/collision'
 import { axialToPixel } from '@/game/hexMath'
+import { CELL_SIZES, PREVIEW } from '@/game/renderConstants'
 import type { Piece } from '@/game/types'
 import { HexCell } from './HexCell'
 
@@ -10,7 +11,7 @@ interface NextPieceProps {
   size?: number
 }
 
-export function NextPiece({ piece, size = 15 }: NextPieceProps) {
+export function NextPiece({ piece, size = CELL_SIZES.PREVIEW }: NextPieceProps) {
   let renderData: { coords: ReturnType<typeof getPieceCoordinates>; viewBox: string } | null = null
 
   if (piece) {
@@ -31,7 +32,7 @@ export function NextPiece({ piece, size = 15 }: NextPieceProps) {
     const centerY = (minY + maxY) / 2
 
     // Fixed square viewBox centered on the piece center
-    const viewBoxSize = 100
+    const viewBoxSize = PREVIEW.VIEWBOX_SIZE
     const halfSize = viewBoxSize / 2
 
     renderData = {
@@ -46,8 +47,8 @@ export function NextPiece({ piece, size = 15 }: NextPieceProps) {
       <div className="flex justify-center">
         <svg
           viewBox={renderData?.viewBox ?? "0 0 100 100"}
-          width="128"
-          height="128"
+          width={PREVIEW.SVG_SIZE}
+          height={PREVIEW.SVG_SIZE}
           preserveAspectRatio="xMidYMid meet"
         >
           {piece && renderData && renderData.coords.map((coord, index) => (

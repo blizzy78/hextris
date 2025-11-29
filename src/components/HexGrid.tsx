@@ -2,6 +2,7 @@
 
 import { FIELD_COORDS } from '@/game/gameModes'
 import { axialToPixel } from '@/game/hexMath'
+import { PADDING } from '@/game/renderConstants'
 import type { AxialCoord, FieldShape, RenderableCell } from '@/game/types'
 import { HexCell } from './HexCell'
 
@@ -33,7 +34,7 @@ function calculateBounds(coords: AxialCoord[], size: number, padding: number) {
   return { minX, maxX, minY, maxY, width, height }
 }
 
-export function HexGrid({ cells, size, padding = 10 }: HexGridProps) {
+export function HexGrid({ cells, size, padding = PADDING.DEFAULT_GRID }: HexGridProps) {
   const bounds = calculateBounds(FIELD_COORDS, size, padding)
 
   const hexPoints = Array.from({ length: 6 }, (_, i) => {

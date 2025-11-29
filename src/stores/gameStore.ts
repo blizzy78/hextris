@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { FIELD_SHAPE, SPAWN_POSITION } from '../game/gameModes'
 import { axialToKey } from '../game/hexMath'
 import { getPieceCells, spawnPiece } from '../game/pieces'
-import { calculateLevel, calculateSpeed } from '../game/scoring'
+import { calculateLevel, calculateSpeed, SCORING } from '../game/scoring'
 import type { GameState, GridState, Piece } from '../game/types'
 import { GameStatus } from '../game/types'
 import { useGameLoopStore } from './gameLoopStore'
@@ -51,7 +51,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   score: 0,
   level: 1,
   linesCleared: 0,
-  speed: 1000,
+  speed: SCORING.BASE_DROP_SPEED,
   status: GameStatus.Idle,
   isNewHighScore: false,
   previousHighScore: 0,
@@ -67,7 +67,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       score: 0,
       level: 1,
       linesCleared: 0,
-      speed: 1000,
+      speed: SCORING.BASE_DROP_SPEED,
       status: GameStatus.Playing,
       isNewHighScore: false
     })

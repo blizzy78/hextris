@@ -4,6 +4,7 @@ import { getPieceCoordinates } from '@/game/collision'
 import { FIELD_SHAPE } from '@/game/gameModes'
 import { axialToKey, keyToAxial } from '@/game/hexMath'
 import { calculateDropPosition } from '@/game/movement'
+import { CELL_SIZES, PADDING } from '@/game/renderConstants'
 import type { GridState, Piece, RenderableCell } from '@/game/types'
 import { HexGrid } from './HexGrid'
 
@@ -13,7 +14,7 @@ interface GameBoardProps {
   size?: number
 }
 
-export function GameBoard({ grid, currentPiece, size = 20 }: GameBoardProps) {
+export function GameBoard({ grid, currentPiece, size = CELL_SIZES.BOARD }: GameBoardProps) {
   // Prepare cells for rendering
   const cells: RenderableCell[] = []
 
@@ -54,7 +55,7 @@ export function GameBoard({ grid, currentPiece, size = 20 }: GameBoardProps) {
 
   return (
     <div className="relative h-full flex items-center justify-center bg-gray-900 rounded-lg border border-gray-700">
-      <HexGrid cells={cells} fieldShape={FIELD_SHAPE} size={size} padding={20} />
+      <HexGrid cells={cells} fieldShape={FIELD_SHAPE} size={size} padding={PADDING.GRID} />
     </div>
   )
 }

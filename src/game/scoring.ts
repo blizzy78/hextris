@@ -3,7 +3,7 @@
 /**
  * Scoring constants
  */
-const SCORING = {
+export const SCORING = {
   BASE_POINTS_PER_LINE: 100,
   POINTS_PER_PIECE_LOCK: 10, // Points awarded for locking a piece
   COMBO_MULTIPLIERS: {
@@ -13,7 +13,11 @@ const SCORING = {
     4: 8    // Quad or more
   },
   LINES_PER_LEVEL: 10, // Level up every 10 lines
-  MAX_LEVEL: 20        // Cap at level 20
+  MAX_LEVEL: 20,       // Cap at level 20
+  // Speed constants (milliseconds)
+  BASE_DROP_SPEED: 1000,       // Drop interval at level 1
+  SPEED_DECREASE_PER_LEVEL: 50, // Speed increase per level
+  MIN_DROP_SPEED: 100,         // Fastest possible drop interval
 } as const
 
 /**
@@ -62,9 +66,6 @@ export function calculateLevel(totalLinesCleared: number): number {
  * @returns Milliseconds between automatic drops
  */
 export function calculateSpeed(level: number): number {
-  // Base speed: 1000ms at level 1
-  // Decrease by 50ms per level
-  // Minimum: 100ms
-  const speed = 1000 - (level - 1) * 50
-  return Math.max(100, speed)
+  const speed = SCORING.BASE_DROP_SPEED - (level - 1) * SCORING.SPEED_DECREASE_PER_LEVEL
+  return Math.max(SCORING.MIN_DROP_SPEED, speed)
 }

@@ -1,6 +1,7 @@
 // HexCell component - renders a single hexagon as SVG polygon
 
 import { axialToPixel } from '@/game/hexMath'
+import { GHOST, GLOW, SHADOW } from '@/game/renderConstants'
 import type { AxialCoord } from '@/game/types'
 import { memo, useEffect, useRef, useState } from 'react'
 
@@ -61,7 +62,7 @@ const HexCellComponent = ({
     if (clearing && !wasClearing.current) {
       wasClearing.current = true
       const startTime = performance.now()
-      const duration = 150 // Animation duration in ms
+      const duration = GLOW.ANIMATION_DURATION
 
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime
@@ -98,7 +99,7 @@ const HexCellComponent = ({
         <polygon
           points={points}
           fill={color}
-          opacity={0.2}
+          opacity={GHOST.OPACITY}
         />
       </g>
     )
@@ -107,17 +108,17 @@ const HexCellComponent = ({
   // Calculate glow parameters based on line count
   // Base glow + additional glow per extra line (capped at reasonable max)
   const lineCount = clearing?.lineCount ?? 0
-  const baseGlowRadius = 4
-  const glowPerLine = 3
-  const maxGlowRadius = 20
-  const targetGlowRadius = Math.min(baseGlowRadius + (lineCount - 1) * glowPerLine, maxGlowRadius)
+  const targetGlowRadius = Math.min(
+    GLOW.BASE_RADIUS + (lineCount - 1) * GLOW.RADIUS_PER_LINE,
+    GLOW.MAX_RADIUS
+  )
   const currentGlowRadius = targetGlowRadius * glowIntensity
 
   // Glow opacity also scales with line count
-  const baseGlowOpacity = 0.6
-  const opacityPerLine = 0.1
-  const maxGlowOpacity = 1
-  const targetGlowOpacity = Math.min(baseGlowOpacity + (lineCount - 1) * opacityPerLine, maxGlowOpacity)
+  const targetGlowOpacity = Math.min(
+    GLOW.BASE_OPACITY + (lineCount - 1) * GLOW.OPACITY_PER_LINE,
+    GLOW.MAX_OPACITY
+  )
   const currentGlowOpacity = targetGlowOpacity * glowIntensity
 
   return (
@@ -129,18 +130,18 @@ const HexCellComponent = ({
           <polygon
             points={points}
             fill="#ffffff"
-            opacity={currentGlowOpacity * 0.5}
+            opacity={currentGlowOpacity * GLOW.OUTER_OPACITY_MULT}
             style={{
-              filter: `blur(${currentGlowRadius * 1.5}px)`,
+              filter: `blur(${currentGlowRadius * GLOW.OUTER_BLUR_MULT}px)`,
             }}
           />
           {/* Inner glow layer */}
           <polygon
             points={points}
             fill="#ffffff"
-            opacity={currentGlowOpacity * 0.8}
+            opacity={currentGlowOpacity * GLOW.INNER_OPACITY_MULT}
             style={{
-              filter: `blur(${currentGlowRadius * 0.5}px)`,
+              filter: `blur(${currentGlowRadius * GLOW.INNER_BLUR_MULT}px)`,
             }}
           />
         </>
@@ -150,8 +151,8 @@ const HexCellComponent = ({
       <polygon
         points={points}
         fill={color}
-        opacity={opacity * 0.3}
-        filter="blur(3px)"
+        opacity={opacity * SHADOW.OPACITY}
+        filter={`blur(${SHADOW.BLUR_PX}px)`}
       />
 
       {/* Main cell */}
