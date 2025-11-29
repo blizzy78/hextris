@@ -3,7 +3,7 @@ import { axialToKey } from '@/game/hexMath'
 import type { Line, LineClearStage } from '@/game/lineDetection'
 import { detectLinesForAnimation } from '@/game/lineDetection'
 import { hardDrop, moveDown, moveLeft, moveRight, rotateWithWallKick } from '@/game/movement'
-import { calculateLevel, calculateLockScore, calculateScore, calculateSpeed } from '@/game/scoring'
+import { calculateCascadeScore, calculateLevel, calculateLockScore, calculateSpeed } from '@/game/scoring'
 import type { GridState } from '@/game/types'
 import { GameStatus } from '@/game/types'
 import { useGameLoop } from '@/hooks/useGameLoop'
@@ -96,20 +96,33 @@ async function processAllLineClearStages(
   updateLinesCleared: (count: number) => void
 ): Promise<number> {
   let totalLinesCleared = 0
+  let totalPoints = 0
   let previousGridAfterGravity: GridState | null = null
 
-  for (const stage of stages) {
+  for (let stageIndex = 0; stageIndex < stages.length; stageIndex++) {
+    const stage = stages[stageIndex]!
+    const cascadeStage = stageIndex + 1 // 1-indexed (1 = initial, 2+ = cascades)
+
     totalLinesCleared += stage.lines.length
+
+    // Calculate points for this stage with cascade multiplier
+    const latestState = useGameStore.getState()
+    const stagePoints = calculateCascadeScore(
+      stage.lines.length,
+      latestState.level,
+      cascadeStage
+    )
+    totalPoints += stagePoints
+
     await processLineClearStage(stage, previousGridAfterGravity)
     previousGridAfterGravity = stage.gridAfterGravity
   }
 
   // Update score and level after all animations complete
-  const latestState = useGameStore.getState()
-  const points = calculateScore(totalLinesCleared, latestState.level)
-  updateScore(points)
+  updateScore(totalPoints)
   updateLinesCleared(totalLinesCleared)
 
+  const latestState = useGameStore.getState()
   const newLevel = calculateLevel(latestState.linesCleared + totalLinesCleared)
   const newSpeed = calculateSpeed(newLevel)
   useGameStore.setState({ level: newLevel, speed: newSpeed })
