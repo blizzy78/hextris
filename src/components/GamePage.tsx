@@ -19,7 +19,7 @@ export function GamePage() {
           linesCleared={linesCleared}
         />
 
-        <NextPiece piece={status === GameStatus.Idle ? null : nextPiece} />
+        <NextPiece piece={status === GameStatus.Playing ? nextPiece : null} />
       </div>
 
       <div className="relative flex-1 max-w-2xl w-full h-full flex items-center justify-center">

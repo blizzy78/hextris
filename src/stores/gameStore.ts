@@ -47,7 +47,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Initial state
   grid: initializeGrid(),
   currentPiece: null,
-  nextPiece: spawnPiece(SPAWN_POSITION),
+  nextPiece: null,
   score: 0,
   level: 1,
   linesCleared: 0,
@@ -90,7 +90,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const key = axialToKey(coord)
       const cellState = state.grid.get(key)
       if (cellState && cellState.filled) {
-        set({ status: GameStatus.GameOver, currentPiece: null })
+        // Keep the piece that triggered game over visible
+        set({ status: GameStatus.GameOver, currentPiece: nextCurrent })
         return false
       }
     }
