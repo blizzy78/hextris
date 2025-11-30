@@ -10,14 +10,14 @@ import type { AxialCoord, FieldShape, GridState, SpecialCellType } from './types
  */
 export const SPECIAL_CELL_SPAWN = {
   /** Base chance (0-1) for bomb cells at level 1 */
-  BOMB_BASE_CHANCE: 0.02,
+  BOMB_BASE_CHANCE: 0.05,
   /** Bomb spawn chance increase per level */
   BOMB_INCREASE_PER_LEVEL: 0.005,
   /** Maximum bomb spawn chance */
   BOMB_MAX_CHANCE: 0.15,
 
   /** Base chance (0-1) for multiplier cells at level 1 */
-  MULTIPLIER_BASE_CHANCE: 0.015,
+  MULTIPLIER_BASE_CHANCE: 0.03,
   /** Multiplier spawn chance increase per level */
   MULTIPLIER_INCREASE_PER_LEVEL: 0.004,
   /** Maximum multiplier spawn chance */
