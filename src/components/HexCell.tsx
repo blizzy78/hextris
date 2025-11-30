@@ -1,7 +1,7 @@
 // HexCell component - renders a single hexagon as SVG polygon
 
 import { axialToPixel } from '@/game/hexMath'
-import { GHOST, GLOW, SHADOW, SPECIAL_CELL_VISUALS } from '@/game/renderConstants'
+import { COLORS, GHOST, GLOW, SHADOW, SPECIAL_CELL_VISUALS } from '@/game/renderConstants'
 import type { AxialCoord, SpecialCellType } from '@/game/types'
 import { memo, useEffect, useRef, useState } from 'react'
 
@@ -78,7 +78,7 @@ const HexCellComponent = ({
   coord,
   size,
   color,
-  stroke = '#374151',
+  stroke = COLORS.CELL_STROKE,
   strokeWidth = 1,
   opacity = 1,
   isGhost = false,
@@ -234,7 +234,7 @@ const HexCellComponent = ({
           {/* Outer glow layer */}
           <polygon
             points={points}
-            fill="#ffffff"
+            fill={COLORS.CLEARING_GLOW}
             opacity={currentGlowOpacity * GLOW.OUTER_OPACITY_MULT}
             style={{
               filter: `blur(${currentGlowRadius * GLOW.OUTER_BLUR_MULT}px)`,
@@ -243,7 +243,7 @@ const HexCellComponent = ({
           {/* Inner glow layer */}
           <polygon
             points={points}
-            fill="#ffffff"
+            fill={COLORS.CLEARING_GLOW}
             opacity={currentGlowOpacity * GLOW.INNER_OPACITY_MULT}
             style={{
               filter: `blur(${currentGlowRadius * GLOW.INNER_BLUR_MULT}px)`,

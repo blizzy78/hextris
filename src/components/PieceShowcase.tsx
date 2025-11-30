@@ -2,7 +2,7 @@
 
 import { axialToPixel } from '@/game/hexMath';
 import { PIECE_METADATA } from '@/game/pieces';
-import { CELL_SIZES, PADDING } from '@/game/renderConstants';
+import { CELL_SIZES, COLORS, PADDING } from '@/game/renderConstants';
 import type { PieceType } from '@/game/types';
 import { HexCell } from './HexCell';
 
@@ -40,7 +40,7 @@ export function PieceShowcase() {
                   coord={coord}
                   size={cellSize}
                   color={metadata.color}
-                  stroke="#374151"
+                  stroke={COLORS.CELL_STROKE}
                   strokeWidth={1}
                 />
               ))}

@@ -1,6 +1,6 @@
 // SpecialBlockShowcase component - displays special block types with pulsing animations
 
-import { CELL_SIZES, PADDING, SPECIAL_CELL_VISUALS } from '@/game/renderConstants'
+import { CELL_SIZES, COLORS, getSpecialCellColor, PADDING, SPECIAL_CELL_VISUALS } from '@/game/renderConstants'
 import type { SpecialCellType } from '@/game/types'
 import { HexCell } from './HexCell'
 
@@ -8,7 +8,6 @@ interface SpecialBlockInfo {
   type: SpecialCellType
   name: string
   description: string
-  color: string
 }
 
 const SPECIAL_BLOCKS: SpecialBlockInfo[] = [
@@ -16,19 +15,16 @@ const SPECIAL_BLOCKS: SpecialBlockInfo[] = [
     type: 'bomb',
     name: 'Bomb',
     description: 'Clears neighbors',
-    color: '#ef4444',
   },
   {
     type: 'multiplier',
     name: 'Multiplier',
     description: '2× line score',
-    color: '#eab308',
   },
   {
     type: 'frozen',
     name: 'Frozen',
     description: 'Clears twice',
-    color: '#06b6d4',
   },
 ]
 
@@ -59,8 +55,8 @@ export function SpecialBlockShowcase() {
               <HexCell
                 coord={{ q: 0, r: 0 }}
                 size={cellSize}
-                color={block.color}
-                stroke="#374151"
+                color={getSpecialCellColor(block.type) ?? COLORS.CELL_STROKE}
+                stroke={COLORS.CELL_STROKE}
                 strokeWidth={1}
                 special={block.type}
               />

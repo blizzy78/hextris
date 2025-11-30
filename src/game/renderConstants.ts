@@ -1,5 +1,19 @@
 // Rendering constants for visual elements
 
+import type { SpecialCellType } from './types'
+
+/**
+ * Common color constants used across rendering
+ */
+export const COLORS = {
+  /** Default cell stroke color (gray border) */
+  CELL_STROKE: '#374151',
+  /** White color for clearing glow effects */
+  CLEARING_GLOW: '#ffffff',
+  /** White flash color for animations */
+  FLASH_WHITE: '#ffffff',
+} as const
+
 /**
  * Cell size constants for different display contexts
  */
@@ -119,3 +133,19 @@ export const SPECIAL_CELL_VISUALS = {
   /** Maximum glow intensity during pulse (0-1) */
   PULSE_MAX_INTENSITY: 1.0,
 } as const
+
+/**
+ * Get the display color for a special cell type.
+ * Returns the glow color for special cells, or undefined for normal cells.
+ */
+export function getSpecialCellColor(special: SpecialCellType | undefined): string | undefined {
+  if (!special) return undefined
+  switch (special) {
+    case 'bomb':
+      return SPECIAL_CELL_VISUALS.BOMB_GLOW_COLOR
+    case 'multiplier':
+      return SPECIAL_CELL_VISUALS.MULTIPLIER_GLOW_COLOR
+    case 'frozen':
+      return SPECIAL_CELL_VISUALS.FROZEN_GLOW_COLOR
+  }
+}

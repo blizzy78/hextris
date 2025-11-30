@@ -4,6 +4,7 @@ import type { Line, LineClearStage } from '@/game/lineDetection'
 import { detectLinesForAnimation, getGravityFrames } from '@/game/lineDetection'
 import { hardDrop, moveDown, moveDownLeft, moveDownRight, moveLeft, moveRight, rotateWithWallKick } from '@/game/movement'
 import { getPieceCells } from '@/game/pieces'
+import { COLORS } from '@/game/renderConstants'
 import { calculateCascadeScore, calculateLevel, calculateLockScore, calculateSpeed } from '@/game/scoring'
 import { applyBombExplosions, getFilledNeighbors, maybeSpawnSpecialCell } from '@/game/specialCells'
 import type { AxialCoord, GridState, Piece } from '@/game/types'
@@ -53,7 +54,7 @@ function createBlinkGrid(baseGrid: GridState, lines: Line[]): GridState {
     if (cellState?.filled) {
       blinkGrid.set(key, {
         filled: true,
-        color: '#ffffff',
+        color: COLORS.FLASH_WHITE,
         clearing: { lineCount },
       })
     }
@@ -74,7 +75,7 @@ function createBombBlinkGrid(baseGrid: GridState, bombCells: AxialCoord[]): Grid
     if (cellState?.filled) {
       blinkGrid.set(key, {
         filled: true,
-        color: '#ffffff',  // White flash like line clears
+        color: COLORS.FLASH_WHITE,  // White flash like line clears
         clearing: { lineCount: 1 },
       })
     }
