@@ -168,15 +168,14 @@ function getHexNeighbors(coord: AxialCoord): AxialCoord[] {
  *
  * A cell is grounded if:
  * 1. It's directly on the floor (nothing below in field), OR
- * 2. The cell directly below it is grounded (vertical support), OR
- * 3. It's connected (hex-adjacent) to any grounded cell (same rigid body)
+ * 2. The cell directly below it is grounded (vertical support only)
  *
- * This ensures connected components behave as rigid units - if any cell
- * in a connected group touches ground, the whole group is grounded.
+ * Note: For independent gravity, we only propagate grounded status vertically.
+ * Adjacent cells in other directions do NOT make a cell grounded.
  */
 function classifyGroundedAndFloating(
   filledCells: Array<{ key: string; coord: AxialCoord; cellState: CellState }>,
-  filledKeys: Set<string>,
+  _filledKeys: Set<string>,
   fieldShape: FieldShape
 ): { grounded: Set<string>; floating: Set<string> } {
   const grounded = new Set<string>()
@@ -190,10 +189,8 @@ function classifyGroundedAndFloating(
     }
   }
 
-  // Second pass: propagate grounded status through connections
-  // A cell is grounded if:
-  // - The cell directly below it is grounded (vertical stacking), OR
-  // - Any hex-adjacent filled cell is grounded (connected component)
+  // Second pass: propagate grounded status ONLY through vertical stacking
+  // A cell is grounded if the cell directly below it is grounded
   let changed = true
   while (changed) {
     changed = false
@@ -209,15 +206,8 @@ function classifyGroundedAndFloating(
         continue
       }
 
-      // Check all hex neighbors (connected component support)
-      for (const neighbor of getHexNeighbors(coord)) {
-        const neighborKey = axialToKey(neighbor)
-        if (filledKeys.has(neighborKey) && grounded.has(neighborKey)) {
-          grounded.add(key)
-          changed = true
-          break
-        }
-      }
+      // Note: We intentionally do NOT check hex neighbors for grounded status.
+      // Each cell falls independently - only vertical support matters.
     }
   }
 
@@ -233,9 +223,14 @@ function classifyGroundedAndFloating(
 }
 
 /**
+ * (DEPRECATED - kept for reference)
  * Find connected components among floating cells
  * Two cells are connected if they are hex neighbors
+ *
+ * Note: This was used when floating masses fell as rigid units.
+ * Now each floating block falls independently.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function findFloatingComponents(
   floatingCells: Array<{ key: string; coord: AxialCoord; cellState: CellState }>
 ): Array<Array<{ key: string; coord: AxialCoord; cellState: CellState }>> {
@@ -272,8 +267,9 @@ function findFloatingComponents(
 }
 
 /**
- * Apply gravity - each connected floating component moves independently as a rigid unit.
- * A component stops when ANY of its cells would hit the floor or a grounded cell.
+ * Apply gravity - each floating block falls independently.
+ * Each block falls down one row if the target position is valid and unoccupied.
+ * Blocks fall simultaneously but independently - no rigid body behavior.
  */
 export function applyGravityStep(
   grid: GridState,
@@ -307,63 +303,39 @@ export function applyGravityStep(
     return { grid, moved: false }
   }
 
-  // Find connected components among floating cells
-  const components = findFloatingComponents(floatingCells)
-
   // Build new grid starting with grounded cells
   const newGrid = new Map<string, CellState>()
   for (const { key, cellState } of groundedCells) {
     newGrid.set(key, cellState)
   }
 
-  // Track which cells are now occupied (for collision with other components)
+  // Track which cells are now occupied
   const occupiedKeys = new Set(groundedKeys)
+
+  // Sort floating cells by r descending (bottom to top) to process lower cells first
+  // This prevents cells from falling "through" each other
+  const sortedFloatingCells = [...floatingCells].sort((a, b) => b.coord.r - a.coord.r)
 
   let anyMoved = false
 
-  // Process each component independently
-  for (const component of components) {
-    const componentKeys = new Set(component.map(c => c.key))
+  // Process each floating block independently
+  for (const { coord, cellState } of sortedFloatingCells) {
+    const targetCoord = { q: coord.q, r: coord.r + 1 }
+    const targetKey = axialToKey(targetCoord)
 
-    // Check if this component can move down by one row
-    // It can move if ALL its cells can move to valid positions
-    let canMove = true
-    for (const { coord } of component) {
-      const targetKey = axialToKey({ q: coord.q, r: coord.r + 1 })
-
-      // Check if target is in field
-      if (!fieldShape.has(targetKey)) {
-        canMove = false
-        break
-      }
-
-      // Check if target is occupied by something other than this component
-      if (occupiedKeys.has(targetKey)) {
-        canMove = false
-        break
-      }
-
-      // Check if target is occupied by a non-component filled cell
-      if (filledKeys.has(targetKey) && !componentKeys.has(targetKey)) {
-        canMove = false
-        break
-      }
-    }
+    // Check if this block can move down
+    const canMove = fieldShape.has(targetKey) && !occupiedKeys.has(targetKey)
 
     if (canMove) {
-      // Move all cells in this component down by one
-      for (const { coord, cellState } of component) {
-        const newKey = axialToKey({ q: coord.q, r: coord.r + 1 })
-        newGrid.set(newKey, cellState)
-        occupiedKeys.add(newKey)
-      }
+      // Move block down by one row
+      newGrid.set(targetKey, cellState)
+      occupiedKeys.add(targetKey)
       anyMoved = true
     } else {
-      // Component stays in place - add to grid and mark as occupied
-      for (const { key, cellState } of component) {
-        newGrid.set(key, cellState)
-        occupiedKeys.add(key)
-      }
+      // Block stays in place
+      const currentKey = axialToKey(coord)
+      newGrid.set(currentKey, cellState)
+      occupiedKeys.add(currentKey)
     }
   }
 

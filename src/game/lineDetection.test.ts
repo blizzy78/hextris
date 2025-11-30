@@ -83,8 +83,8 @@ describe('Gravity', () => {
     })
   })
 
-  describe('connected blocks (rigid body)', () => {
-    it('should fall together as one unit', () => {
+  describe('connected blocks (independent falling)', () => {
+    it('should fall independently to their respective floor positions', () => {
       // Two horizontally adjacent blocks at top
       const grid = createGrid([
         { q: 1, r: 0 },
@@ -94,14 +94,13 @@ describe('Gravity', () => {
       const positions = getFilledPositions(result)
 
       expect(positions).toHaveLength(2)
-      // Both stop when the first one hits the floor (rigid body)
+      // Each block falls independently to its own floor
       // Column 1 has bottomR=5, column 2 has bottomR=4
-      // The block at q=2 hits floor first (r=4), so both stop there
-      expect(positions).toContainEqual({ q: 1, r: 4 })
-      expect(positions).toContainEqual({ q: 2, r: 4 })
+      expect(positions).toContainEqual({ q: 1, r: getBottomR(1) }) // r=5
+      expect(positions).toContainEqual({ q: 2, r: getBottomR(2) }) // r=4
     })
 
-    it('should stop when any cell hits obstruction', () => {
+    it('should fall independently past obstructions', () => {
       // L-shaped piece at top
       const grid = createGrid([
         { q: 2, r: 0 },
@@ -114,9 +113,12 @@ describe('Gravity', () => {
       const positions = getFilledPositions(result)
 
       expect(positions).toHaveLength(4)
-      // The L-piece should stop when q=3 cell lands on obstruction
+      // q=3 block stops on obstruction
       expect(positions).toContainEqual({ q: 3, r: getBottomR(3) }) // original obstruction
-      expect(positions).toContainEqual({ q: 3, r: getBottomR(3) - 1 }) // L-piece bottom-right
+      expect(positions).toContainEqual({ q: 3, r: getBottomR(3) - 1 }) // q=3 block from L-piece
+      // q=2 blocks fall independently to their floor
+      expect(positions).toContainEqual({ q: 2, r: getBottomR(2) }) // bottom
+      expect(positions).toContainEqual({ q: 2, r: getBottomR(2) - 1 }) // stacked
     })
   })
 
@@ -168,9 +170,9 @@ describe('Gravity', () => {
   })
 
   describe('masses merging on landing', () => {
-    it('should stop upper mass when it touches landed lower mass', () => {
+    it('should stack blocks when they land in same column', () => {
       // Lower mass closer to ground
-      // Upper mass will fall and should stop when it touches the lower mass
+      // Upper mass will fall and should stack on top of lower mass
       const grid = createGrid([
         // Upper mass (2 cells)
         { q: 2, r: 0, color: 'red' },
@@ -192,7 +194,7 @@ describe('Gravity', () => {
       expect(positions).toContainEqual({ q: 2, r: bottomR - 3 })
     })
 
-    it('should merge horizontally adjacent masses after one lands', () => {
+    it('should land blocks in adjacent columns independently', () => {
       // Two separate masses that will become adjacent after falling
       const grid = createGrid([
         // Left mass
@@ -215,17 +217,16 @@ describe('Gravity', () => {
       expect(positions).toContainEqual({ q: 1, r: getBottomR(1) })
     })
 
-    it('should fall as rigid merged mass after line clear below (with overhang)', () => {
+    it('should fall blocks independently after line clear (no rigid body)', () => {
       // Scenario:
       // - Upper mass: L-shaped with overhang (q=1,r=0 and q=2,r=0 and q=2,r=1)
       // - Lower mass: single block below upper mass (q=2,r=3)
       // - Ground line: full row that will be cleared (simulates line clear)
       //
-      // After falling and merging, clear the ground line.
-      // The merged mass should then fall as ONE rigid body.
-      // The overhang at q=1 should NOT fall faster than q=2 cells.
+      // After clearing the ground line, each block should fall independently.
+      // The overhang at q=1 should fall to its own floor, NOT stay attached to q=2 cells.
 
-      // First: let two separate masses fall and merge
+      // First: let masses fall and land on the ground row
       const upperMass = [
         { q: 1, r: 0, color: 'red' }, // overhang - extends left
         { q: 2, r: 0, color: 'red' },
@@ -244,18 +245,13 @@ describe('Gravity', () => {
 
       const initialGrid = createGrid([...upperMass, ...lowerMass, ...groundRow])
 
-      // Step 1: Let masses fall until they merge and land on the ground row
+      // Step 1: Let masses fall until they land on the ground row
       const afterFirstFall = applyGravityUntilSettled(initialGrid, TEST_FIELD)
 
       // Verify they've landed on the ground row
-      // Lower mass at q=2 should be at bottomR-1 (on top of ground)
-      // Upper mass should be stacked above it
       const bottomR2 = getBottomR(2)
       const positionsAfterFirst = getFilledPositions(afterFirstFall)
       expect(positionsAfterFirst).toContainEqual({ q: 2, r: bottomR2 - 1 }) // lower mass on ground
-      expect(positionsAfterFirst).toContainEqual({ q: 2, r: bottomR2 - 2 }) // upper mass cell
-      expect(positionsAfterFirst).toContainEqual({ q: 2, r: bottomR2 - 3 }) // upper mass cell
-      expect(positionsAfterFirst).toContainEqual({ q: 1, r: bottomR2 - 3 }) // overhang
 
       // Step 2: Clear the ground row (simulate line clear)
       const afterClear = new Map(afterFirstFall)
@@ -263,25 +259,23 @@ describe('Gravity', () => {
         afterClear.delete(axialToKey({ q: cell.q, r: cell.r }))
       }
 
-      // Step 3: Apply gravity - the merged mass should fall as ONE unit
-      // The overhang at q=1 should NOT separate from the rest
+      // Step 3: Apply gravity - blocks should fall INDEPENDENTLY
       const finalGrid = applyGravityUntilSettled(afterClear, TEST_FIELD)
       const finalPositions = getFilledPositions(finalGrid)
 
-      // The merged mass has 4 cells total
+      // The 4 blocks should be at their independent floor positions
       expect(finalPositions).toHaveLength(4)
 
-      // Key test: rigid body behavior
+      // Key test: independent falling behavior
       // Column 1 has bottomR=5, column 2 has bottomR=4
-      // If rigid: all cells stop when q=2 column hits bottom (r=4)
-      // If NOT rigid: q=1 overhang would fall to r=5 independently
+      // If independent: q=1 block falls to its floor (r=5), q=2 blocks stack at their floor (r=4, r=3, r=2)
 
-      // The lowest cell in q=2 column should be at bottomR(2) = 4
-      expect(finalPositions).toContainEqual({ q: 2, r: 4 }) // bottom of q=2 stack
-      expect(finalPositions).toContainEqual({ q: 2, r: 3 }) // middle of q=2 stack
-      expect(finalPositions).toContainEqual({ q: 2, r: 2 }) // top of q=2 stack
-      // The overhang at q=1 should be at the SAME row as top of q=2 (r=2), NOT at bottomR(1)=5
-      expect(finalPositions).toContainEqual({ q: 1, r: 2 }) // overhang stays connected
+      // q=1 overhang should fall to its own floor
+      expect(finalPositions).toContainEqual({ q: 1, r: getBottomR(1) }) // r=5
+      // q=2 cells should stack from their floor
+      expect(finalPositions).toContainEqual({ q: 2, r: getBottomR(2) }) // r=4
+      expect(finalPositions).toContainEqual({ q: 2, r: getBottomR(2) - 1 }) // r=3
+      expect(finalPositions).toContainEqual({ q: 2, r: getBottomR(2) - 2 }) // r=2
     })
   })
 
