@@ -109,12 +109,6 @@ function shouldSkipBoundaryEdge(edgeIndex: number, boundaryEdges: number[]): boo
 export function HexGrid({ cells, size, padding = PADDING.DEFAULT_GRID }: HexGridProps) {
   const bounds = calculateBounds(FIELD_COORDS, size, padding)
 
-  const hexPoints = Array.from({ length: 6 }, (_, i) => {
-    const angleDeg = 60 * i
-    const angleRad = (Math.PI / 180) * angleDeg
-    return `${size * Math.cos(angleRad)},${size * Math.sin(angleRad)}`
-  }).join(' ')
-
   // Pre-compute boundary edges for emphasized rendering
   const boundaryLines: { x1: number; y1: number; x2: number; y2: number; key: string }[] = []
   for (const coord of FIELD_COORDS) {
@@ -143,21 +137,6 @@ export function HexGrid({ cells, size, padding = PADDING.DEFAULT_GRID }: HexGrid
       className="w-full h-full"
       style={{ maxWidth: '100%', maxHeight: '100%' }}
     >
-      {/* Field outline */}
-      {FIELD_COORDS.map((coord) => {
-        const { x, y } = axialToPixel(coord, size)
-        return (
-          <polygon
-            key={`outline-${coord.q},${coord.r}`}
-            points={hexPoints}
-            fill="none"
-            stroke="#1f2937"
-            strokeWidth={1}
-            transform={`translate(${x}, ${y})`}
-          />
-        )
-      })}
-
       {/* Emphasized boundary edges (left, right, bottom - not top) */}
       {boundaryLines.map((line) => (
         <line
