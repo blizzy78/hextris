@@ -1,7 +1,8 @@
 // Piece definitions and rotation logic
 
 import { axialToCube, cubeToAxial } from './hexMath'
-import type { AxialCoord, Piece, PieceShape, PieceType } from './types'
+import { rollSpecialPieceType } from './specialCells'
+import type { AxialCoord, Piece, PieceShape, PieceType, SpecialCellType } from './types'
 
 // Neighbor offsets for hexagonal grid (flat-top orientation)
 // These represent the 6 directions from a center tile at (0, 0)
@@ -193,7 +194,8 @@ function rotateCoordinate(coord: AxialCoord, steps: number): AxialCoord {
 function createPiece(
   type: PieceType,
   position: AxialCoord,
-  rotation = 0
+  rotation = 0,
+  special?: SpecialCellType
 ): Piece {
   const metadata = PIECE_METADATA[type]
   return {
@@ -201,7 +203,8 @@ function createPiece(
     shape: metadata.shape,
     color: metadata.color,
     position,
-    rotation
+    rotation,
+    special
   }
 }
 
@@ -281,8 +284,9 @@ function getMinROffset(type: PieceType): number {
  * Adjusts position so the topmost block of the piece touches the spawn row
  * @param position Base spawn position (top edge of field)
  * @param excludeTypes Optional piece types to exclude from random selection
+ * @param level Current game level (used to determine special piece chance)
  */
-export function spawnPiece(position: AxialCoord, excludeTypes?: PieceType[]): Piece {
+export function spawnPiece(position: AxialCoord, excludeTypes?: PieceType[], level = 1): Piece {
   const type = getRandomPieceType(excludeTypes)
 
   // Calculate offset to ensure topmost block is at spawn position
@@ -293,5 +297,8 @@ export function spawnPiece(position: AxialCoord, excludeTypes?: PieceType[]): Pi
     r: position.r - minROffset  // If minR is -2, piece center moves to r+2 so top block is at r
   }
 
-  return createPiece(type, adjustedPosition)
+  // Roll for special piece (bomb or multiplier, never frozen)
+  const special = rollSpecialPieceType(level)
+
+  return createPiece(type, adjustedPosition, 0, special)
 }

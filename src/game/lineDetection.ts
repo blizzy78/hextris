@@ -4,10 +4,36 @@ import { axialToKey, keyToAxial } from './hexMath'
 import {
     applyBombExplosions,
     getBombCells,
+    getFilledNeighbors,
     hasMultiplierCell,
     processFrozenCells,
 } from './specialCells'
 import type { AxialCoord, CellState, FieldShape, GridState } from './types'
+
+/**
+ * Get all cells that will be destroyed by bomb explosions
+ * Used for animation purposes
+ */
+function getBombExplosionCells(
+  grid: GridState,
+  bombCells: AxialCoord[],
+  fieldShape: FieldShape
+): AxialCoord[] {
+  if (bombCells.length === 0) {
+    return []
+  }
+
+  const cellsToDestroy = new Set<string>()
+
+  for (const bombCoord of bombCells) {
+    const filledNeighbors = getFilledNeighbors(bombCoord, grid, fieldShape)
+    for (const neighbor of filledNeighbors) {
+      cellsToDestroy.add(axialToKey(neighbor))
+    }
+  }
+
+  return Array.from(cellsToDestroy).map(key => keyToAxial(key))
+}
 
 /**
  * Line direction type - the two meaningful line directions in a hexagonal grid
@@ -80,14 +106,19 @@ function detectLines(grid: GridState, fieldShape: FieldShape): Line[] {
  * Clear lines from the grid and return the new grid state
  * Handles special cells:
  * - Frozen cells: first clear converts to normal, second clear removes
- * - Bomb cells: destroy 3 adjacent cells when cleared
+ * - Bomb cells: destroy adjacent cells when cleared (returned for animation)
  * - Multiplier cells: tracked for scoring (handled by caller)
  */
 function clearLines(
   grid: GridState,
   lines: Line[],
   fieldShape: FieldShape
-): { grid: GridState; hasMultiplier: boolean } {
+): {
+  gridAfterLineClear: GridState
+  bombExplosionCells: AxialCoord[]
+  gridAfterBombs: GridState
+  hasMultiplier: boolean
+} {
   // Collect all cells to clear from all lines
   const allCellsToCheck: AxialCoord[] = []
   for (const line of lines) {
@@ -104,15 +135,18 @@ function clearLines(
   const bombCells = getBombCells(updatedGrid, cellsToRemove)
 
   // Remove the cells that should be cleared
-  const newGrid = new Map(updatedGrid)
+  const gridAfterLineClear = new Map(updatedGrid)
   for (const cell of cellsToRemove) {
-    newGrid.delete(axialToKey(cell))
+    gridAfterLineClear.delete(axialToKey(cell))
   }
 
-  // Apply bomb explosions after the line is cleared
-  const gridAfterBombs = applyBombExplosions(newGrid, bombCells, fieldShape)
+  // Calculate which cells will be destroyed by bomb explosions (for animation)
+  const bombExplosionCells = getBombExplosionCells(gridAfterLineClear, bombCells, fieldShape)
 
-  return { grid: gridAfterBombs, hasMultiplier }
+  // Apply bomb explosions after the line is cleared
+  const gridAfterBombs = applyBombExplosions(gridAfterLineClear, bombCells, fieldShape)
+
+  return { gridAfterLineClear, bombExplosionCells, gridAfterBombs, hasMultiplier }
 }
 
 /**
@@ -341,7 +375,7 @@ export function applyGravityStep(
  * Each frame represents one row of falling
  * Returns array of grid states from first fall to final resting position
  */
-function getGravityFrames(
+export function getGravityFrames(
   grid: GridState,
   fieldShape: FieldShape
 ): GridState[] {
@@ -363,7 +397,9 @@ function getGravityFrames(
  */
 export interface LineClearStage {
   lines: Line[]
-  gridAfterClear: GridState
+  gridAfterLineClear: GridState  // Grid after lines cleared, before bomb explosions
+  bombExplosionCells: AxialCoord[]  // Cells destroyed by bomb explosions
+  gridAfterClear: GridState  // Grid after lines AND bombs cleared
   gravityFrames: GridState[]  // Intermediate gravity states for animation
   gridAfterGravity: GridState  // Final state after all gravity
   hasMultiplier: boolean      // Whether any multiplier cell was cleared in this stage
@@ -389,17 +425,30 @@ export function detectLinesForAnimation(
     }
 
     // Clear the lines (handles frozen cells, bomb explosions, multiplier detection)
-    const { grid: gridAfterClear, hasMultiplier } = clearLines(currentGrid, lines, fieldShape)
+    const {
+      gridAfterLineClear,
+      bombExplosionCells,
+      gridAfterBombs,
+      hasMultiplier
+    } = clearLines(currentGrid, lines, fieldShape)
 
     // Get all gravity frames for animation
-    const gravityFrames = getGravityFrames(gridAfterClear, fieldShape)
+    const gravityFrames = getGravityFrames(gridAfterBombs, fieldShape)
 
-    // Final state is the last frame, or gridAfterClear if no movement
+    // Final state is the last frame, or gridAfterBombs if no movement
     const gridAfterGravity = gravityFrames.length > 0
       ? gravityFrames[gravityFrames.length - 1]!
-      : gridAfterClear
+      : gridAfterBombs
 
-    stages.push({ lines, gridAfterClear, gravityFrames, gridAfterGravity, hasMultiplier })
+    stages.push({
+      lines,
+      gridAfterLineClear,
+      bombExplosionCells,
+      gridAfterClear: gridAfterBombs,
+      gravityFrames,
+      gridAfterGravity,
+      hasMultiplier
+    })
 
     // Continue with the grid after gravity to check for new lines
     currentGrid = gridAfterGravity

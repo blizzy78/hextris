@@ -50,6 +50,7 @@ export function NextPiece({ piece, size = CELL_SIZES.PREVIEW }: NextPieceProps) 
           width={PREVIEW.SVG_SIZE}
           height={PREVIEW.SVG_SIZE}
           preserveAspectRatio="xMidYMid meet"
+          overflow="visible"
         >
           {piece && renderData && renderData.coords.map((coord, index) => (
             <HexCell
@@ -57,6 +58,7 @@ export function NextPiece({ piece, size = CELL_SIZES.PREVIEW }: NextPieceProps) 
               coord={coord}
               size={size}
               color={piece.color}
+              special={piece.special}
             />
           ))}
         </svg>

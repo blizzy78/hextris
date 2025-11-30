@@ -4,6 +4,12 @@ import { axialToKey } from './hexMath'
 import type { AxialCoord, FieldShape, GridState, SpecialCellType } from './types'
 
 /**
+ * Special piece types that can be assigned to an entire piece
+ * (frozen is excluded - pieces cannot be frozen)
+ */
+export type SpecialPieceType = 'bomb' | 'multiplier'
+
+/**
  * Spawn rate constants for special cells
  * Spawn chance is calculated as: baseChance + (level - 1) * increasePerLevel
  * except for frozen cells which have a fixed rate
@@ -35,6 +41,21 @@ export const SPECIAL_CELL_SPAWN = {
   MULTIPLIER_MAX_COUNT: 3,
   /** Maximum number of frozen cells allowed on the field at once */
   FROZEN_MAX_COUNT: 1,
+
+  // Special piece spawn rates (for entire pieces to be bomb/multiplier)
+  /** Base chance (0-1) for bomb piece at level 1 */
+  BOMB_PIECE_BASE_CHANCE: 0.02,
+  /** Bomb piece spawn chance increase per level */
+  BOMB_PIECE_INCREASE_PER_LEVEL: 0.003,
+  /** Maximum bomb piece spawn chance */
+  BOMB_PIECE_MAX_CHANCE: 0.08,
+
+  /** Base chance (0-1) for multiplier piece at level 1 */
+  MULTIPLIER_PIECE_BASE_CHANCE: 0.015,
+  /** Multiplier piece spawn chance increase per level */
+  MULTIPLIER_PIECE_INCREASE_PER_LEVEL: 0.002,
+  /** Maximum multiplier piece spawn chance */
+  MULTIPLIER_PIECE_MAX_CHANCE: 0.06,
 } as const
 
 /**
@@ -69,6 +90,48 @@ export function getSpawnChance(type: SpecialCellType, level: number): number {
     case 'frozen':
       return SPECIAL_CELL_SPAWN.FROZEN_FIXED_CHANCE
   }
+}
+
+/**
+ * Calculate spawn chance for a special piece type at a given level
+ * Only bomb and multiplier pieces can spawn (never frozen)
+ */
+export function getSpecialPieceSpawnChance(type: SpecialPieceType, level: number): number {
+  switch (type) {
+    case 'bomb': {
+      const chance = SPECIAL_CELL_SPAWN.BOMB_PIECE_BASE_CHANCE +
+        (level - 1) * SPECIAL_CELL_SPAWN.BOMB_PIECE_INCREASE_PER_LEVEL
+      return Math.min(chance, SPECIAL_CELL_SPAWN.BOMB_PIECE_MAX_CHANCE)
+    }
+    case 'multiplier': {
+      const chance = SPECIAL_CELL_SPAWN.MULTIPLIER_PIECE_BASE_CHANCE +
+        (level - 1) * SPECIAL_CELL_SPAWN.MULTIPLIER_PIECE_INCREASE_PER_LEVEL
+      return Math.min(chance, SPECIAL_CELL_SPAWN.MULTIPLIER_PIECE_MAX_CHANCE)
+    }
+  }
+}
+
+/**
+ * Determine if a new piece should be special (bomb/multiplier)
+ * Returns the special type if piece should be special, undefined otherwise
+ */
+export function rollSpecialPieceType(level: number): SpecialPieceType | undefined {
+  const bombChance = getSpecialPieceSpawnChance('bomb', level)
+  const multiplierChance = getSpecialPieceSpawnChance('multiplier', level)
+  const totalChance = bombChance + multiplierChance
+
+  const roll = Math.random()
+  if (roll >= totalChance) {
+    // No special piece
+    return undefined
+  }
+
+  // Determine which special type (proportional to individual chances)
+  const typeRoll = Math.random() * totalChance
+  if (typeRoll < bombChance) {
+    return 'bomb'
+  }
+  return 'multiplier'
 }
 
 /**

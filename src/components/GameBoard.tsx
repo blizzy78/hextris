@@ -51,7 +51,7 @@ export function GameBoard({ grid, currentPiece, size = CELL_SIZES.BOARD }: GameB
   if (currentPiece) {
     const pieceCoords = getPieceCoordinates(currentPiece)
     for (const coord of pieceCoords) {
-      cells.push({ coord, color: currentPiece.color })
+      cells.push({ coord, color: currentPiece.color, special: currentPiece.special })
     }
   }
 

@@ -69,9 +69,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Actions
   startGame: () => {
     useGameLoopStore.getState().resetElapsed()
-    const currentPiece = spawnPiece(SPAWN_POSITION)
+    // Level 1 at start, no special pieces for the first two pieces
+    const currentPiece = spawnPiece(SPAWN_POSITION, undefined, 1)
     const history = [currentPiece.type]
-    const nextPiece = spawnPiece(SPAWN_POSITION, history)
+    const nextPiece = spawnPiece(SPAWN_POSITION, history, 1)
     history.unshift(nextPiece.type)
     set({
       grid: initializeGrid(),
@@ -112,7 +113,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    const newNextPiece = spawnPiece(SPAWN_POSITION, state.pieceHistory)
+    const newNextPiece = spawnPiece(SPAWN_POSITION, state.pieceHistory, state.level)
     const newHistory = [newNextPiece.type, ...state.pieceHistory].slice(0, 3)
     set({
       currentPiece: nextCurrent,
@@ -129,11 +130,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Get all cells occupied by the piece (accounts for rotation)
     const coords = getPieceCells(piece)
 
-    // Mark all piece cells as filled
+    // Mark all piece cells as filled, applying special type if piece is special
     for (const coord of coords) {
       const key = axialToKey(coord)
-      newGrid.set(key, { filled: true, color: piece.color })
+      if (piece.special) {
+        newGrid.set(key, { filled: true, color: piece.color, special: piece.special })
+      } else {
+        newGrid.set(key, { filled: true, color: piece.color })
+      }
     }
+
+    // Note: Bomb piece explosions are handled separately in useGameController
+    // with animation, not here in the store
 
     set({
       grid: newGrid,

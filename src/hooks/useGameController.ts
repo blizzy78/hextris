@@ -1,11 +1,12 @@
 import { FIELD_SHAPE } from '@/game/gameModes'
 import { axialToKey } from '@/game/hexMath'
 import type { Line, LineClearStage } from '@/game/lineDetection'
-import { detectLinesForAnimation } from '@/game/lineDetection'
+import { detectLinesForAnimation, getGravityFrames } from '@/game/lineDetection'
 import { hardDrop, moveDown, moveDownLeft, moveDownRight, moveLeft, moveRight, rotateWithWallKick } from '@/game/movement'
+import { getPieceCells } from '@/game/pieces'
 import { calculateCascadeScore, calculateLevel, calculateLockScore, calculateSpeed } from '@/game/scoring'
-import { maybeSpawnSpecialCell } from '@/game/specialCells'
-import type { GridState } from '@/game/types'
+import { applyBombExplosions, getFilledNeighbors, maybeSpawnSpecialCell } from '@/game/specialCells'
+import type { AxialCoord, GridState, Piece } from '@/game/types'
 import { GameStatus } from '@/game/types'
 import { useGameLoop } from '@/hooks/useGameLoop'
 import { useKeyboard } from '@/hooks/useKeyboard'
@@ -62,6 +63,27 @@ function createBlinkGrid(baseGrid: GridState, lines: Line[]): GridState {
 }
 
 /**
+ * Apply blink effect to cells destroyed by bomb explosions
+ */
+function createBombBlinkGrid(baseGrid: GridState, bombCells: AxialCoord[]): GridState {
+  const blinkGrid = new Map(baseGrid)
+
+  for (const cell of bombCells) {
+    const key = axialToKey(cell)
+    const cellState = blinkGrid.get(key)
+    if (cellState?.filled) {
+      blinkGrid.set(key, {
+        filled: true,
+        color: '#ffffff',  // White flash like line clears
+        clearing: { lineCount: 1 },
+      })
+    }
+  }
+
+  return blinkGrid
+}
+
+/**
  * Process a single line-clearing stage with animation
  */
 async function processLineClearStage(
@@ -71,14 +93,25 @@ async function processLineClearStage(
   // Get base grid for blink effect
   const currentGrid = previousGridAfterGravity ?? useGameStore.getState().grid
 
-  // Show blink effect
+  // Show blink effect for line clear
   const blinkGrid = createBlinkGrid(currentGrid, stage.lines)
   useGameStore.setState({ grid: blinkGrid })
   await delay(ANIMATION_TIMING.BLINK_DURATION)
 
-  // Show cleared grid
-  useGameStore.setState({ grid: stage.gridAfterClear })
+  // Show grid after lines cleared (before bomb explosions)
+  useGameStore.setState({ grid: stage.gridAfterLineClear })
   await delay(ANIMATION_TIMING.CLEAR_DELAY)
+
+  // Animate bomb explosions if any
+  if (stage.bombExplosionCells.length > 0) {
+    const bombBlinkGrid = createBombBlinkGrid(stage.gridAfterLineClear, stage.bombExplosionCells)
+    useGameStore.setState({ grid: bombBlinkGrid })
+    await delay(ANIMATION_TIMING.BLINK_DURATION)
+
+    // Show grid after bomb explosions
+    useGameStore.setState({ grid: stage.gridAfterClear })
+    await delay(ANIMATION_TIMING.CLEAR_DELAY)
+  }
 
   // Animate gravity if needed
   if (stage.gravityFrames.length > 0) {
@@ -239,35 +272,98 @@ export function useGameController() {
       }
     }
 
+    // Capture piece info before locking (needed for bomb animation)
+    const lockedPiece = state.currentPiece
+
     // Lock the piece
     cancelLocking()
-    lockPiece(state.currentPiece)
+    lockPiece(lockedPiece)
     const lockPoints = calculateLockScore(state.level)
     updateScore(lockPoints)
 
-    // Maybe spawn a special cell after locking (before line detection)
-    const gridAfterLock = useGameStore.getState().grid
-    const gridWithSpecial = maybeSpawnSpecialCell(gridAfterLock, FIELD_SHAPE, state.level)
-    if (gridWithSpecial !== gridAfterLock) {
-      useGameStore.setState({ grid: gridWithSpecial })
-    }
+    // Handle bomb piece explosion with animation
+    const processBombPieceExplosion = async (piece: Piece): Promise<void> => {
+      const pieceCells = getPieceCells(piece)
+      const gridAfterLock = useGameStore.getState().grid
 
-    const stages = detectLinesForAnimation(useGameStore.getState().grid, FIELD_SHAPE)
+      // Get all cells that will be destroyed by the bomb
+      const cellsToDestroy: AxialCoord[] = []
+      for (const bombCoord of pieceCells) {
+        const neighbors = getFilledNeighbors(bombCoord, gridAfterLock, FIELD_SHAPE)
+        for (const neighbor of neighbors) {
+          // Don't include the bomb cells themselves in the explosion effect
+          const neighborKey = axialToKey(neighbor)
+          const isBombCell = pieceCells.some(c => axialToKey(c) === neighborKey)
+          if (!isBombCell) {
+            cellsToDestroy.push(neighbor)
+          }
+        }
+      }
 
-    // Spawn next piece or handle game over
-    const trySpawnOrGameOver = () => {
-      const spawnSuccessful = spawnNextPiece()
-      if (!spawnSuccessful) {
-        handleGameOver(highScore, setHighScore, setPreviousHighScore, setIsNewHighScore)
+      // Combine bomb cells + destroyed cells for blink effect
+      const allAffectedCells = [...pieceCells, ...cellsToDestroy]
+
+      if (allAffectedCells.length > 0) {
+        // Brief delay to let React render the locked piece before applying blink
+        // This ensures the HexCell component detects the clearing state transition
+        await delay(16)  // One frame
+
+        // Show blink effect for bomb explosion
+        const blinkGrid = createBombBlinkGrid(gridAfterLock, allAffectedCells)
+        useGameStore.setState({ grid: blinkGrid })
+        await delay(ANIMATION_TIMING.BLINK_DURATION)
+
+        // Apply the actual explosion
+        const newGrid = applyBombExplosions(gridAfterLock, pieceCells, FIELD_SHAPE)
+        // Remove the bomb cells themselves
+        for (const coord of pieceCells) {
+          const key = axialToKey(coord)
+          newGrid.set(key, { filled: false })
+        }
+        useGameStore.setState({ grid: newGrid })
+        await delay(ANIMATION_TIMING.CLEAR_DELAY)
+
+        // Apply gravity to floating cells after explosion
+        const gravityFrames = getGravityFrames(newGrid, FIELD_SHAPE)
+        if (gravityFrames.length > 0) {
+          await animateGravityFrames(gravityFrames)
+        }
       }
     }
 
-    if (stages.length > 0) {
-      // Process line clearing asynchronously
-      processAllLineClearStages(stages, updateScore, updateLinesCleared)
-        .then(trySpawnOrGameOver)
+    // Continue with rest of lock logic (special cell spawn, line detection, etc.)
+    const continueAfterLock = async () => {
+      // Maybe spawn a special cell after locking (before line detection)
+      const gridAfterLock = useGameStore.getState().grid
+      const gridWithSpecial = maybeSpawnSpecialCell(gridAfterLock, FIELD_SHAPE, state.level)
+      if (gridWithSpecial !== gridAfterLock) {
+        useGameStore.setState({ grid: gridWithSpecial })
+      }
+
+      const stages = detectLinesForAnimation(useGameStore.getState().grid, FIELD_SHAPE)
+
+      // Spawn next piece or handle game over
+      const trySpawnOrGameOver = () => {
+        const spawnSuccessful = spawnNextPiece()
+        if (!spawnSuccessful) {
+          handleGameOver(highScore, setHighScore, setPreviousHighScore, setIsNewHighScore)
+        }
+      }
+
+      if (stages.length > 0) {
+        // Process line clearing asynchronously
+        await processAllLineClearStages(stages, updateScore, updateLinesCleared)
+        trySpawnOrGameOver()
+      } else {
+        trySpawnOrGameOver()
+      }
+    }
+
+    // If bomb piece, animate explosion first, then continue
+    if (lockedPiece.special === 'bomb') {
+      processBombPieceExplosion(lockedPiece).then(continueAfterLock)
     } else {
-      trySpawnOrGameOver()
+      continueAfterLock()
     }
   }, [lockPiece, updateCurrentPiece, updateScore, updateLinesCleared, setHighScore, spawnNextPiece, setIsNewHighScore, setPreviousHighScore, highScore, cancelLocking])
 

@@ -68,6 +68,7 @@ export type PieceType = 'I_PIECE' | 'S_PIECE' | 'Z_PIECE' | 'L_PIECE' | 'J_PIECE
 
 /**
  * Piece instance with current position and rotation
+ * If special is set, all cells of this piece will have that special type when locked
  */
 export interface Piece {
   type: PieceType
@@ -75,6 +76,8 @@ export interface Piece {
   color: string
   position: AxialCoord
   rotation: number
+  /** If set, the entire piece is a special piece (bomb/multiplier) */
+  special?: SpecialCellType
 }
 
 /**
