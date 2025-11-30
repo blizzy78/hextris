@@ -107,6 +107,24 @@ export const PIECE_METADATA: Record<PieceType, { shape: PieceShape; color: strin
 }
 
 /**
+ * Spawn rate weights for each piece type.
+ * Higher values = more likely to spawn. Default 1.0 = equal probability.
+ * Set to 0 to disable a piece type from spawning.
+ */
+export const PIECE_SPAWN_RATES: Record<PieceType, number> = {
+  'I_PIECE': 3.0,
+  'S_PIECE': 3.0,
+  'Z_PIECE': 3.0,
+  'L_PIECE': 3.0,
+  'J_PIECE': 3.0,
+  'T_PIECE': 3.0,
+  'P_PIECE': 3.0,
+  'U_PIECE': 2.0,
+  'O_PIECE': 3.0,
+  'Y_PIECE': 1.0
+}
+
+/**
  * Get all cells occupied by a piece
  * Center tile is included only if hasCenter is true for the piece type
  */
@@ -198,16 +216,47 @@ export function rotatePiece(piece: Piece): Piece {
 }
 
 /**
- * Get a random piece type
+ * Get a random piece type using weighted selection based on PIECE_SPAWN_RATES
  * @param excludeTypes Optional piece types to exclude from random selection
  */
 function getRandomPieceType(excludeTypes?: PieceType[]): PieceType {
   const types: PieceType[] = ['I_PIECE', 'S_PIECE', 'Z_PIECE', 'L_PIECE', 'J_PIECE', 'T_PIECE', 'P_PIECE', 'U_PIECE', 'O_PIECE', 'Y_PIECE']
   const excludeSet = new Set(excludeTypes ?? [])
-  const availableTypes = types.filter(t => !excludeSet.has(t))
-  // Invariant: availableTypes.length >= 7 (10 types, max 3 excluded)
-  const randomIndex = Math.floor(Math.random() * availableTypes.length)
-  return availableTypes[randomIndex] as PieceType
+
+  // Build weighted list: only include types with spawn rate > 0 and not excluded
+  const weightedTypes: { type: PieceType; weight: number }[] = []
+  let totalWeight = 0
+
+  for (const type of types) {
+    if (!excludeSet.has(type)) {
+      const weight = PIECE_SPAWN_RATES[type]
+      if (weight > 0) {
+        weightedTypes.push({ type, weight })
+        totalWeight += weight
+      }
+    }
+  }
+
+  // Fallback: if all weights are 0 or excluded, use uniform selection from non-excluded
+  if (totalWeight === 0) {
+    const availableTypes = types.filter(t => !excludeSet.has(t))
+    const randomIndex = Math.floor(Math.random() * availableTypes.length)
+    return availableTypes[randomIndex] as PieceType
+  }
+
+  // Weighted random selection
+  const random = Math.random() * totalWeight
+  let cumulative = 0
+
+  for (const { type, weight } of weightedTypes) {
+    cumulative += weight
+    if (random < cumulative) {
+      return type
+    }
+  }
+
+  // Fallback: return last type (handles floating point edge case)
+  return weightedTypes[weightedTypes.length - 1]!.type
 }
 
 /**
