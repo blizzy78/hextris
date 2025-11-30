@@ -17,8 +17,8 @@ export interface KeyboardControls {
  */
 // Debounce intervals in milliseconds (defined outside component to avoid recreation)
 const DEBOUNCE_INTERVALS = {
-  move: 100,      // Horizontal/vertical movement
-  rotate: 150,    // Rotation
+  move: 50,      // Horizontal/vertical movement
+  rotate: 50,    // Rotation
   hardDrop: 300   // Hard drop (prevent accidental double drops)
 }
 
