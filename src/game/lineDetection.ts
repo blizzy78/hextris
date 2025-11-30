@@ -1,6 +1,12 @@
 // Line detection and clearing for hexagonal Tetris
 
 import { axialToKey, keyToAxial } from './hexMath'
+import {
+    applyBombExplosions,
+    getBombCells,
+    hasMultiplierCell,
+    processFrozenCells,
+} from './specialCells'
 import type { AxialCoord, CellState, FieldShape, GridState } from './types'
 
 /**
@@ -72,18 +78,41 @@ function detectLines(grid: GridState, fieldShape: FieldShape): Line[] {
 
 /**
  * Clear lines from the grid and return the new grid state
+ * Handles special cells:
+ * - Frozen cells: first clear converts to normal, second clear removes
+ * - Bomb cells: destroy 3 adjacent cells when cleared
+ * - Multiplier cells: tracked for scoring (handled by caller)
  */
-function clearLines(grid: GridState, lines: Line[]): GridState {
-  const newGrid = new Map(grid)
-
-  // Remove all cells in completed lines
+function clearLines(
+  grid: GridState,
+  lines: Line[],
+  fieldShape: FieldShape
+): { grid: GridState; hasMultiplier: boolean } {
+  // Collect all cells to clear from all lines
+  const allCellsToCheck: AxialCoord[] = []
   for (const line of lines) {
-    for (const cell of line.cells) {
-      newGrid.delete(axialToKey(cell))
-    }
+    allCellsToCheck.push(...line.cells)
   }
 
-  return newGrid
+  // Check for multiplier cells before clearing
+  const hasMultiplier = hasMultiplierCell(grid, allCellsToCheck)
+
+  // Process frozen cells - some may not be removed yet
+  const { cellsToRemove, updatedGrid } = processFrozenCells(grid, allCellsToCheck)
+
+  // Get bomb cells from the cells that will be removed
+  const bombCells = getBombCells(updatedGrid, cellsToRemove)
+
+  // Remove the cells that should be cleared
+  const newGrid = new Map(updatedGrid)
+  for (const cell of cellsToRemove) {
+    newGrid.delete(axialToKey(cell))
+  }
+
+  // Apply bomb explosions after the line is cleared
+  const gridAfterBombs = applyBombExplosions(newGrid, bombCells, fieldShape)
+
+  return { grid: gridAfterBombs, hasMultiplier }
 }
 
 /**
@@ -337,6 +366,7 @@ export interface LineClearStage {
   gridAfterClear: GridState
   gravityFrames: GridState[]  // Intermediate gravity states for animation
   gridAfterGravity: GridState  // Final state after all gravity
+  hasMultiplier: boolean      // Whether any multiplier cell was cleared in this stage
 }
 
 /**
@@ -358,8 +388,8 @@ export function detectLinesForAnimation(
       break
     }
 
-    // Clear the lines
-    const gridAfterClear = clearLines(currentGrid, lines)
+    // Clear the lines (handles frozen cells, bomb explosions, multiplier detection)
+    const { grid: gridAfterClear, hasMultiplier } = clearLines(currentGrid, lines, fieldShape)
 
     // Get all gravity frames for animation
     const gravityFrames = getGravityFrames(gridAfterClear, fieldShape)
@@ -369,7 +399,7 @@ export function detectLinesForAnimation(
       ? gravityFrames[gravityFrames.length - 1]!
       : gridAfterClear
 
-    stages.push({ lines, gridAfterClear, gravityFrames, gridAfterGravity })
+    stages.push({ lines, gridAfterClear, gravityFrames, gridAfterGravity, hasMultiplier })
 
     // Continue with the grid after gravity to check for new lines
     currentGrid = gridAfterGravity

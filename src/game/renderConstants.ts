@@ -79,3 +79,43 @@ export const GLOW = {
   /** Blur multiplier for inner glow layer */
   INNER_BLUR_MULT: 0.5,
 } as const
+
+/**
+ * Special cell visual constants
+ */
+export const SPECIAL_CELL_VISUALS = {
+  /** Bomb cell glow color (red) */
+  BOMB_GLOW_COLOR: '#ff4444',
+  /** Bomb cell glow radius */
+  BOMB_GLOW_RADIUS: 12,
+  /** Bomb cell glow opacity */
+  BOMB_GLOW_OPACITY: 1.0,
+
+  /** Multiplier cell glow color (gold) */
+  MULTIPLIER_GLOW_COLOR: '#ffd700',
+  /** Multiplier cell glow radius */
+  MULTIPLIER_GLOW_RADIUS: 10,
+  /** Multiplier cell glow opacity */
+  MULTIPLIER_GLOW_OPACITY: 0.9,
+
+  /** Frozen cell glow color (icy blue) */
+  FROZEN_GLOW_COLOR: '#88ddff',
+  /** Frozen cell glow radius */
+  FROZEN_GLOW_RADIUS: 10,
+  /** Frozen cell glow opacity */
+  FROZEN_GLOW_OPACITY: 0.85,
+  /** Frozen cell partially cleared glow opacity (dimmer) */
+  FROZEN_CLEARED_GLOW_OPACITY: 0.4,
+
+  /** Opacity multiplier for outer glow layer of special cells */
+  OUTER_OPACITY_MULT: 0.9,
+  /** Opacity multiplier for inner glow layer of special cells */
+  INNER_OPACITY_MULT: 1.0,
+
+  /** Duration of one full pulse cycle (ms) */
+  PULSE_DURATION: 1200,
+  /** Minimum glow intensity during pulse (0-1) */
+  PULSE_MIN_INTENSITY: 0.5,
+  /** Maximum glow intensity during pulse (0-1) */
+  PULSE_MAX_INTENSITY: 1.0,
+} as const

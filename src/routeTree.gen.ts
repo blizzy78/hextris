@@ -9,9 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SlideTestRouteImport } from './routes/slide-test'
 import { Route as GravityTestRouteImport } from './routes/gravity-test'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SlideTestRoute = SlideTestRouteImport.update({
+  id: '/slide-test',
+  path: '/slide-test',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GravityTestRoute = GravityTestRouteImport.update({
   id: '/gravity-test',
   path: '/gravity-test',
@@ -26,31 +32,42 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/gravity-test': typeof GravityTestRoute
+  '/slide-test': typeof SlideTestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/gravity-test': typeof GravityTestRoute
+  '/slide-test': typeof SlideTestRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/gravity-test': typeof GravityTestRoute
+  '/slide-test': typeof SlideTestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/gravity-test'
+  fullPaths: '/' | '/gravity-test' | '/slide-test'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/gravity-test'
-  id: '__root__' | '/' | '/gravity-test'
+  to: '/' | '/gravity-test' | '/slide-test'
+  id: '__root__' | '/' | '/gravity-test' | '/slide-test'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GravityTestRoute: typeof GravityTestRoute
+  SlideTestRoute: typeof SlideTestRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/slide-test': {
+      id: '/slide-test'
+      path: '/slide-test'
+      fullPath: '/slide-test'
+      preLoaderRoute: typeof SlideTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/gravity-test': {
       id: '/gravity-test'
       path: '/gravity-test'
@@ -71,6 +88,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GravityTestRoute: GravityTestRoute,
+  SlideTestRoute: SlideTestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

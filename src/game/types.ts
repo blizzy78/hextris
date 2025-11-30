@@ -28,6 +28,11 @@ export interface PixelCoord {
 }
 
 /**
+ * Special cell types that add unique behaviors when cleared
+ */
+export type SpecialCellType = 'bomb' | 'multiplier' | 'frozen'
+
+/**
  * Cell state (empty or filled with a color)
  * When clearing, lineCount indicates how many lines are being cleared simultaneously
  */
@@ -36,6 +41,9 @@ export type CellState = {
 } | {
   filled: true
   color: string
+  special?: SpecialCellType
+  /** For frozen cells: true if already cleared once (becomes normal next clear) */
+  frozenCleared?: boolean
   clearing?: {
     lineCount: number
   }
@@ -92,6 +100,7 @@ export interface GameState {
   grid: GridState
   currentPiece: Piece | null
   nextPiece: Piece | null
+  pieceHistory: PieceType[] // Last 3 piece types (most recent first)
   score: number
   level: number
   linesCleared: number
@@ -107,6 +116,8 @@ export interface RenderableCell {
   color: string
   opacity?: number
   isGhost?: boolean
+  special?: SpecialCellType
+  frozenCleared?: boolean
   clearing?: {
     lineCount: number
   }

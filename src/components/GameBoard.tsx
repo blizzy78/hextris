@@ -25,6 +25,8 @@ export function GameBoard({ grid, currentPiece, size = CELL_SIZES.BOARD }: GameB
       cells.push({
         coord,
         color: cellState.color,
+        special: cellState.special,
+        frozenCleared: cellState.frozenCleared,
         clearing: cellState.clearing
       })
     }

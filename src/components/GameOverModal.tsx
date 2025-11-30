@@ -41,7 +41,7 @@ export function GameOverModal({
               New High Score!
             </h2>
             <p className="text-gray-300 text-center mb-6">
-              Congratulations! You&apos;ve beaten your previous best!
+              Congratulations!<br/>You&apos;ve beaten your previous best!
             </p>
           </>
         ) : (

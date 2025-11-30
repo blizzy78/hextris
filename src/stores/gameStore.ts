@@ -27,6 +27,9 @@ interface GameStore extends GameState {
   // Additional state
   isNewHighScore: boolean
   previousHighScore: number
+  // Lock delay state for tucking support
+  isLocking: boolean
+  lockStartTime: number
   // Actions
   startGame: () => void
   spawnNextPiece: () => boolean
@@ -38,6 +41,10 @@ interface GameStore extends GameState {
   setIsNewHighScore: (isNew: boolean) => void
   setPreviousHighScore: (score: number) => void
   gameOver: () => void
+  // Lock delay actions
+  startLocking: () => void
+  resetLocking: () => void
+  cancelLocking: () => void
 }
 
 /**
@@ -48,6 +55,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   grid: initializeGrid(),
   currentPiece: null,
   nextPiece: null,
+  pieceHistory: [],
   score: 0,
   level: 1,
   linesCleared: 0,
@@ -55,21 +63,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
   status: GameStatus.Idle,
   isNewHighScore: false,
   previousHighScore: 0,
+  isLocking: false,
+  lockStartTime: 0,
 
   // Actions
   startGame: () => {
     useGameLoopStore.getState().resetElapsed()
     const currentPiece = spawnPiece(SPAWN_POSITION)
+    const history = [currentPiece.type]
+    const nextPiece = spawnPiece(SPAWN_POSITION, history)
+    history.unshift(nextPiece.type)
     set({
       grid: initializeGrid(),
       currentPiece,
-      nextPiece: spawnPiece(SPAWN_POSITION, currentPiece.type),
+      nextPiece,
+      pieceHistory: history.slice(0, 3),
       score: 0,
       level: 1,
       linesCleared: 0,
       speed: SCORING.BASE_DROP_SPEED,
       status: GameStatus.Playing,
-      isNewHighScore: false
+      isNewHighScore: false,
+      isLocking: false,
+      lockStartTime: 0
     })
   },
 
@@ -96,9 +112,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
+    const newNextPiece = spawnPiece(SPAWN_POSITION, state.pieceHistory)
+    const newHistory = [newNextPiece.type, ...state.pieceHistory].slice(0, 3)
     set({
       currentPiece: nextCurrent,
-      nextPiece: spawnPiece(SPAWN_POSITION, nextCurrent.type)
+      nextPiece: newNextPiece,
+      pieceHistory: newHistory
     })
     return true
   },
@@ -158,5 +177,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   gameOver: () => {
     set({ status: GameStatus.GameOver })
+  },
+
+  startLocking: () => {
+    const state = get()
+    if (!state.isLocking) {
+      set({ isLocking: true, lockStartTime: performance.now() })
+    }
+  },
+
+  resetLocking: () => {
+    set({ isLocking: true, lockStartTime: performance.now() })
+  },
+
+  cancelLocking: () => {
+    set({ isLocking: false, lockStartTime: 0 })
   }
 }))

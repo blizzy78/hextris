@@ -199,12 +199,13 @@ export function rotatePiece(piece: Piece): Piece {
 
 /**
  * Get a random piece type
- * @param excludeType Optional piece type to exclude from random selection
+ * @param excludeTypes Optional piece types to exclude from random selection
  */
-function getRandomPieceType(excludeType?: PieceType): PieceType {
+function getRandomPieceType(excludeTypes?: PieceType[]): PieceType {
   const types: PieceType[] = ['I_PIECE', 'S_PIECE', 'Z_PIECE', 'L_PIECE', 'J_PIECE', 'T_PIECE', 'P_PIECE', 'U_PIECE', 'O_PIECE', 'Y_PIECE']
-  const availableTypes = excludeType ? types.filter(t => t !== excludeType) : types
-  // Invariant: availableTypes.length >= 9 (10 types, max 1 excluded)
+  const excludeSet = new Set(excludeTypes ?? [])
+  const availableTypes = types.filter(t => !excludeSet.has(t))
+  // Invariant: availableTypes.length >= 7 (10 types, max 3 excluded)
   const randomIndex = Math.floor(Math.random() * availableTypes.length)
   return availableTypes[randomIndex] as PieceType
 }
@@ -230,10 +231,10 @@ function getMinROffset(type: PieceType): number {
  * Spawn a new random piece at the given position
  * Adjusts position so the topmost block of the piece touches the spawn row
  * @param position Base spawn position (top edge of field)
- * @param excludeType Optional piece type to exclude from random selection
+ * @param excludeTypes Optional piece types to exclude from random selection
  */
-export function spawnPiece(position: AxialCoord, excludeType?: PieceType): Piece {
-  const type = getRandomPieceType(excludeType)
+export function spawnPiece(position: AxialCoord, excludeTypes?: PieceType[]): Piece {
+  const type = getRandomPieceType(excludeTypes)
 
   // Calculate offset to ensure topmost block is at spawn position
   // minR is negative (e.g., -1 for top neighbor), so we subtract it to push piece down

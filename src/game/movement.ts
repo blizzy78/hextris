@@ -71,6 +71,52 @@ export function moveRight(
 }
 
 /**
+ * Move piece diagonally down-left (for tucking during lock delay)
+ * Unlike moveLeft which maintains visual row, this moves to the
+ * lower-left hex neighbor, enabling pieces to slide under overhangs.
+ */
+export function moveDownLeft(
+  piece: Piece,
+  grid: GridState,
+  fieldShape: FieldShape
+): Piece | null {
+  const newQ = piece.position.q - 1
+  // For down-left: from even column, r stays same; from odd column, r increases
+  // This is the opposite of "horizontal" left which would move up from even columns
+  const rAdjust = piece.position.q % 2 === 0 ? 0 : 1
+  const newPiece: Piece = {
+    ...piece,
+    position: { q: newQ, r: piece.position.r + rAdjust }
+  }
+
+  const result = isValidPiecePosition(newPiece, grid, fieldShape)
+  return result.valid ? newPiece : null
+}
+
+/**
+ * Move piece diagonally down-right (for tucking during lock delay)
+ * Unlike moveRight which maintains visual row, this moves to the
+ * lower-right hex neighbor, enabling pieces to slide under overhangs.
+ */
+export function moveDownRight(
+  piece: Piece,
+  grid: GridState,
+  fieldShape: FieldShape
+): Piece | null {
+  const newQ = piece.position.q + 1
+  // For down-right: from odd column, r stays same; from even column, r increases
+  // This is the opposite of "horizontal" right which would move up from odd columns
+  const rAdjust = piece.position.q % 2 === 0 ? 1 : 0
+  const newPiece: Piece = {
+    ...piece,
+    position: { q: newQ, r: piece.position.r + rAdjust }
+  }
+
+  const result = isValidPiecePosition(newPiece, grid, fieldShape)
+  return result.valid ? newPiece : null
+}
+
+/**
  * Calculate the lowest valid position for a piece (for hard drop and ghost piece)
  */
 export function calculateDropPosition(

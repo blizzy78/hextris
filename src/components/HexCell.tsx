@@ -1,8 +1,8 @@
 // HexCell component - renders a single hexagon as SVG polygon
 
 import { axialToPixel } from '@/game/hexMath'
-import { GHOST, GLOW, SHADOW } from '@/game/renderConstants'
-import type { AxialCoord } from '@/game/types'
+import { GHOST, GLOW, SHADOW, SPECIAL_CELL_VISUALS } from '@/game/renderConstants'
+import type { AxialCoord, SpecialCellType } from '@/game/types'
 import { memo, useEffect, useRef, useState } from 'react'
 
 interface HexCellProps {
@@ -13,6 +13,8 @@ interface HexCellProps {
   strokeWidth?: number
   opacity?: number
   isGhost?: boolean
+  special?: SpecialCellType
+  frozenCleared?: boolean
   clearing?: {
     lineCount: number
   }
@@ -39,6 +41,39 @@ function getHexagonPoints(size: number): string {
   return points.map(([x, y]) => `${x},${y}`).join(' ')
 }
 
+/**
+ * Get glow configuration for a special cell type
+ */
+function getSpecialCellGlow(
+  special: SpecialCellType | undefined,
+  frozenCleared: boolean | undefined
+): { color: string; radius: number; opacity: number } | null {
+  if (!special) return null
+
+  switch (special) {
+    case 'bomb':
+      return {
+        color: SPECIAL_CELL_VISUALS.BOMB_GLOW_COLOR,
+        radius: SPECIAL_CELL_VISUALS.BOMB_GLOW_RADIUS,
+        opacity: SPECIAL_CELL_VISUALS.BOMB_GLOW_OPACITY,
+      }
+    case 'multiplier':
+      return {
+        color: SPECIAL_CELL_VISUALS.MULTIPLIER_GLOW_COLOR,
+        radius: SPECIAL_CELL_VISUALS.MULTIPLIER_GLOW_RADIUS,
+        opacity: SPECIAL_CELL_VISUALS.MULTIPLIER_GLOW_OPACITY,
+      }
+    case 'frozen':
+      return {
+        color: SPECIAL_CELL_VISUALS.FROZEN_GLOW_COLOR,
+        radius: SPECIAL_CELL_VISUALS.FROZEN_GLOW_RADIUS,
+        opacity: frozenCleared
+          ? SPECIAL_CELL_VISUALS.FROZEN_CLEARED_GLOW_OPACITY
+          : SPECIAL_CELL_VISUALS.FROZEN_GLOW_OPACITY,
+      }
+  }
+}
+
 const HexCellComponent = ({
   coord,
   size,
@@ -47,6 +82,8 @@ const HexCellComponent = ({
   strokeWidth = 1,
   opacity = 1,
   isGhost = false,
+  special,
+  frozenCleared,
   clearing,
 }: HexCellProps) => {
   const { x, y } = axialToPixel(coord, size)
@@ -56,6 +93,44 @@ const HexCellComponent = ({
   const [glowIntensity, setGlowIntensity] = useState(clearing ? 0 : 0)
   const animationRef = useRef<number | null>(null)
   const wasClearing = useRef(false)
+
+  // Pulse animation for special cells - use ref to avoid sync setState in effect
+  const [pulseIntensity, setPulseIntensity] = useState(1)
+  const pulseAnimationRef = useRef<number | null>(null)
+  const isPulsing = special && !clearing
+
+  // Start pulse animation when special cell is present
+  useEffect(() => {
+    if (isPulsing) {
+      const startTime = performance.now()
+      const duration = SPECIAL_CELL_VISUALS.PULSE_DURATION
+      const minIntensity = SPECIAL_CELL_VISUALS.PULSE_MIN_INTENSITY
+      const maxIntensity = SPECIAL_CELL_VISUALS.PULSE_MAX_INTENSITY
+
+      const animatePulse = (currentTime: number) => {
+        const elapsed = currentTime - startTime
+        // Use sine wave for smooth fade in/out (0 to 1 to 0)
+        const progress = (elapsed % duration) / duration
+        const sineValue = Math.sin(progress * Math.PI * 2)
+        // Map sine (-1 to 1) to intensity range
+        const intensity = minIntensity + ((sineValue + 1) / 2) * (maxIntensity - minIntensity)
+        setPulseIntensity(intensity)
+        pulseAnimationRef.current = requestAnimationFrame(animatePulse)
+      }
+
+      pulseAnimationRef.current = requestAnimationFrame(animatePulse)
+    }
+
+    return () => {
+      if (pulseAnimationRef.current !== null) {
+        cancelAnimationFrame(pulseAnimationRef.current)
+        pulseAnimationRef.current = null
+      }
+    }
+  }, [isPulsing])
+
+  // Reset pulse intensity when not pulsing (computed value, not in effect)
+  const effectivePulseIntensity = isPulsing ? pulseIntensity : 1
 
   useEffect(() => {
     // Only animate when transitioning to clearing state
@@ -121,8 +196,38 @@ const HexCellComponent = ({
   )
   const currentGlowOpacity = targetGlowOpacity * glowIntensity
 
+  // Get special cell glow configuration
+  const specialGlow = getSpecialCellGlow(special, frozenCleared)
+
+  // Determine actual fill color - special cells use their glow color
+  const fillColor = specialGlow ? specialGlow.color : color
+
   return (
     <g transform={`translate(${x}, ${y})`}>
+      {/* Special cell glow effect (bomb/multiplier/frozen) with pulse animation */}
+      {specialGlow && !clearing && (
+        <>
+          {/* Outer glow layer */}
+          <polygon
+            points={points}
+            fill={specialGlow.color}
+            opacity={specialGlow.opacity * SPECIAL_CELL_VISUALS.OUTER_OPACITY_MULT * effectivePulseIntensity}
+            style={{
+              filter: `blur(${specialGlow.radius * GLOW.OUTER_BLUR_MULT}px)`,
+            }}
+          />
+          {/* Inner glow layer */}
+          <polygon
+            points={points}
+            fill={specialGlow.color}
+            opacity={specialGlow.opacity * SPECIAL_CELL_VISUALS.INNER_OPACITY_MULT * effectivePulseIntensity}
+            style={{
+              filter: `blur(${specialGlow.radius * GLOW.INNER_BLUR_MULT}px)`,
+            }}
+          />
+        </>
+      )}
+
       {/* Animated clearing glow effect - only when clearing */}
       {clearing && glowIntensity > 0 && (
         <>
@@ -150,7 +255,7 @@ const HexCellComponent = ({
       {/* Shadow/glow effect (normal state) */}
       <polygon
         points={points}
-        fill={color}
+        fill={fillColor}
         opacity={opacity * SHADOW.OPACITY}
         filter={`blur(${SHADOW.BLUR_PX}px)`}
       />
@@ -158,7 +263,7 @@ const HexCellComponent = ({
       {/* Main cell */}
       <polygon
         points={points}
-        fill={color}
+        fill={fillColor}
         stroke={stroke}
         strokeWidth={strokeWidth}
         opacity={opacity}

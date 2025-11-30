@@ -73,6 +73,8 @@ export function HexGrid({ cells, size, padding = PADDING.DEFAULT_GRID }: HexGrid
           color={cell.color}
           opacity={cell.opacity}
           isGhost={cell.isGhost}
+          special={cell.special}
+          frozenCleared={cell.frozenCleared}
           clearing={cell.clearing}
         />
       ))}

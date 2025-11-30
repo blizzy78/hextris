@@ -2,8 +2,9 @@ import { FIELD_SHAPE } from '@/game/gameModes'
 import { axialToKey } from '@/game/hexMath'
 import type { Line, LineClearStage } from '@/game/lineDetection'
 import { detectLinesForAnimation } from '@/game/lineDetection'
-import { hardDrop, moveDown, moveLeft, moveRight, rotateWithWallKick } from '@/game/movement'
+import { hardDrop, moveDown, moveDownLeft, moveDownRight, moveLeft, moveRight, rotateWithWallKick } from '@/game/movement'
 import { calculateCascadeScore, calculateLevel, calculateLockScore, calculateSpeed } from '@/game/scoring'
+import { maybeSpawnSpecialCell } from '@/game/specialCells'
 import type { GridState } from '@/game/types'
 import { GameStatus } from '@/game/types'
 import { useGameLoop } from '@/hooks/useGameLoop'
@@ -105,17 +106,25 @@ async function processAllLineClearStages(
 
     totalLinesCleared += stage.lines.length
 
-    // Calculate points for this stage with cascade multiplier
+    // Calculate points for this stage with cascade multiplier and special cell bonus
     const latestState = useGameStore.getState()
     const stagePoints = calculateCascadeScore(
       stage.lines.length,
       latestState.level,
-      cascadeStage
+      cascadeStage,
+      stage.hasMultiplier
     )
     totalPoints += stagePoints
 
     await processLineClearStage(stage, previousGridAfterGravity)
     previousGridAfterGravity = stage.gridAfterGravity
+
+    // After gravity settles, maybe spawn a special cell
+    const currentGrid = useGameStore.getState().grid
+    const gridWithSpecial = maybeSpawnSpecialCell(currentGrid, FIELD_SHAPE, latestState.level)
+    if (gridWithSpecial !== currentGrid) {
+      useGameStore.setState({ grid: gridWithSpecial })
+    }
   }
 
   // Update score and level after all animations complete
@@ -171,8 +180,31 @@ export function useGameController() {
   const spawnNextPiece = useGameStore((state) => state.spawnNextPiece)
   const setIsNewHighScore = useGameStore((state) => state.setIsNewHighScore)
   const setPreviousHighScore = useGameStore((state) => state.setPreviousHighScore)
+  // Lock delay actions
+  const startLocking = useGameStore((state) => state.startLocking)
+  const resetLocking = useGameStore((state) => state.resetLocking)
+  const cancelLocking = useGameStore((state) => state.cancelLocking)
 
-  // Handle piece drop
+  // Check if piece is in a "would lock" position and manage lock delay accordingly
+  // Called after every successful movement to ensure lock delay starts immediately
+  const checkAndUpdateLockState = useCallback((piece: NonNullable<typeof currentPiece>) => {
+    const state = useGameStore.getState()
+    const canMoveDown = moveDown(piece, state.grid, FIELD_SHAPE) !== null
+
+    if (canMoveDown) {
+      // Piece can move down - cancel any lock delay
+      cancelLocking()
+    } else {
+      // Piece can't move down - start or reset lock delay
+      if (state.isLocking) {
+        resetLocking()
+      } else {
+        startLocking()
+      }
+    }
+  }, [cancelLocking, resetLocking, startLocking])
+
+  // Handle piece drop (called by game loop timer)
   const handleDrop = useCallback(() => {
     const state = useGameStore.getState()
     if (!state.currentPiece || state.status !== GameStatus.Playing) return
@@ -181,13 +213,44 @@ export function useGameController() {
 
     if (movedPiece) {
       updateCurrentPiece(movedPiece)
+      // Piece moved down successfully, cancel any lock delay
+      cancelLocking()
       return
     }
 
-    // Lock piece and award points
+    // Piece can't move down - start lock delay for tucking
+    startLocking()
+  }, [updateCurrentPiece, startLocking, cancelLocking])
+
+  // Handle actual piece lock (called when lock delay expires or on hard drop)
+  // When force=true, skip the "can move down" check (used for hard drop)
+  const handleLock = useCallback((force = false) => {
+    const state = useGameStore.getState()
+    if (!state.currentPiece || state.status !== GameStatus.Playing) return
+
+    // Unless forced, check if piece can still move down (player may have moved it)
+    if (!force) {
+      const movedPiece = moveDown(state.currentPiece, state.grid, FIELD_SHAPE)
+      if (movedPiece) {
+        // Piece can now move - cancel lock and continue
+        updateCurrentPiece(movedPiece)
+        cancelLocking()
+        return
+      }
+    }
+
+    // Lock the piece
+    cancelLocking()
     lockPiece(state.currentPiece)
     const lockPoints = calculateLockScore(state.level)
     updateScore(lockPoints)
+
+    // Maybe spawn a special cell after locking (before line detection)
+    const gridAfterLock = useGameStore.getState().grid
+    const gridWithSpecial = maybeSpawnSpecialCell(gridAfterLock, FIELD_SHAPE, state.level)
+    if (gridWithSpecial !== gridAfterLock) {
+      useGameStore.setState({ grid: gridWithSpecial })
+    }
 
     const stages = detectLinesForAnimation(useGameStore.getState().grid, FIELD_SHAPE)
 
@@ -206,52 +269,72 @@ export function useGameController() {
     } else {
       trySpawnOrGameOver()
     }
-  }, [lockPiece, updateCurrentPiece, updateScore, updateLinesCleared, setHighScore, spawnNextPiece, setIsNewHighScore, setPreviousHighScore, highScore])
+  }, [lockPiece, updateCurrentPiece, updateScore, updateLinesCleared, setHighScore, spawnNextPiece, setIsNewHighScore, setPreviousHighScore, highScore, cancelLocking])
 
   // Game loop
-  useGameLoop({ onDrop: handleDrop })
+  useGameLoop({ onDrop: handleDrop, onLock: handleLock })
 
-  // Keyboard controls
+  // Keyboard controls - check lock state after every movement
   const onMoveLeft = useCallback(() => {
     const state = useGameStore.getState()
     if (state.currentPiece) {
-      const moved = moveLeft(state.currentPiece, state.grid, FIELD_SHAPE)
-      if (moved) updateCurrentPiece(moved)
+      // During lock delay, use diagonal down-left movement to enable tucking
+      // Otherwise use horizontal left movement
+      const moveFn = state.isLocking ? moveDownLeft : moveLeft
+      const moved = moveFn(state.currentPiece, state.grid, FIELD_SHAPE)
+      if (moved) {
+        updateCurrentPiece(moved)
+        checkAndUpdateLockState(moved)
+      }
     }
-  }, [updateCurrentPiece])
+  }, [updateCurrentPiece, checkAndUpdateLockState])
 
   const onMoveRight = useCallback(() => {
     const state = useGameStore.getState()
     if (state.currentPiece) {
-      const moved = moveRight(state.currentPiece, state.grid, FIELD_SHAPE)
-      if (moved) updateCurrentPiece(moved)
+      // During lock delay, use diagonal down-right movement to enable tucking
+      // Otherwise use horizontal right movement
+      const moveFn = state.isLocking ? moveDownRight : moveRight
+      const moved = moveFn(state.currentPiece, state.grid, FIELD_SHAPE)
+      if (moved) {
+        updateCurrentPiece(moved)
+        checkAndUpdateLockState(moved)
+      }
     }
-  }, [updateCurrentPiece])
+  }, [updateCurrentPiece, checkAndUpdateLockState])
 
   const onMoveDown = useCallback(() => {
     const state = useGameStore.getState()
     if (state.currentPiece) {
       const moved = moveDown(state.currentPiece, state.grid, FIELD_SHAPE)
-      if (moved) updateCurrentPiece(moved)
+      if (moved) {
+        updateCurrentPiece(moved)
+        checkAndUpdateLockState(moved)
+      }
     }
-  }, [updateCurrentPiece])
+  }, [updateCurrentPiece, checkAndUpdateLockState])
 
   const onRotate = useCallback(() => {
     const state = useGameStore.getState()
     if (state.currentPiece) {
       const rotated = rotateWithWallKick(state.currentPiece, state.grid, FIELD_SHAPE)
-      if (rotated) updateCurrentPiece(rotated)
+      if (rotated) {
+        updateCurrentPiece(rotated)
+        checkAndUpdateLockState(rotated)
+      }
     }
-  }, [updateCurrentPiece])
+  }, [updateCurrentPiece, checkAndUpdateLockState])
 
   const onHardDrop = useCallback(() => {
     const state = useGameStore.getState()
     if (state.currentPiece) {
+      // Drop piece to lowest position and update in store
       const dropped = hardDrop(state.currentPiece, state.grid, FIELD_SHAPE)
       updateCurrentPiece(dropped)
-      handleDrop()
+      // Force immediate lock - no further control allowed after hard drop
+      handleLock(true)
     }
-  }, [updateCurrentPiece, handleDrop])
+  }, [updateCurrentPiece, handleLock])
 
   useKeyboard({ onMoveLeft, onMoveRight, onMoveDown, onRotate, onHardDrop }, status === GameStatus.Playing || status === GameStatus.Idle)
 

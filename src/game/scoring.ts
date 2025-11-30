@@ -1,5 +1,7 @@
 // Scoring system with combos and level progression
 
+import { SPECIAL_CELL_SPAWN } from './specialCells'
+
 /**
  * Scoring constants
  */
@@ -64,12 +66,14 @@ export function calculateScore(linesCleared: number, currentLevel: number): numb
  * @param linesCleared Number of lines cleared in this stage
  * @param currentLevel Current game level
  * @param cascadeStage Which stage of the cascade (1 = initial, 2+ = chain reactions)
+ * @param hasMultiplier Whether any multiplier cell was cleared in this stage
  * @returns Points earned for this stage
  */
 export function calculateCascadeScore(
   linesCleared: number,
   currentLevel: number,
-  cascadeStage: number
+  cascadeStage: number,
+  hasMultiplier: boolean = false
 ): number {
   if (linesCleared === 0) return 0
 
@@ -80,7 +84,10 @@ export function calculateCascadeScore(
   const cascadeKey = Math.min(cascadeStage, SCORING.MAX_CASCADE_STAGE) as 1 | 2 | 3 | 4 | 5
   const cascadeMultiplier = SCORING.CASCADE_MULTIPLIERS[cascadeKey]
 
-  return Math.floor(baseScore * cascadeMultiplier)
+  // Apply multiplier cell bonus if present
+  const specialMultiplier = hasMultiplier ? SPECIAL_CELL_SPAWN.MULTIPLIER_SCORE_BONUS : 1
+
+  return Math.floor(baseScore * cascadeMultiplier * specialMultiplier)
 }
 
 /**
