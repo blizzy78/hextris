@@ -1,8 +1,10 @@
 import { GameBoard } from '@/components/GameBoard'
 import { GameOverModal } from '@/components/GameOverModal'
+import { KeyboardControlsDisplay } from '@/components/KeyboardControlsDisplay'
 import { NextPiece } from '@/components/NextPiece'
 import { PieceShowcase } from '@/components/PieceShowcase'
 import { ScoreDisplay } from '@/components/ScoreDisplay'
+import { SpecialBlockShowcase } from '@/components/SpecialBlockShowcase'
 import { GameStatus } from '@/game/types'
 import { useGameController } from '@/hooks/useGameController'
 
@@ -34,6 +36,12 @@ export function GamePage() {
                 Press any key to start
               </div>
               <PieceShowcase />
+              <div className="mt-8">
+                <SpecialBlockShowcase />
+              </div>
+              <div className="mt-6">
+                <KeyboardControlsDisplay />
+              </div>
             </div>
           </div>
         )}
