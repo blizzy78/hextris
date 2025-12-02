@@ -125,3 +125,13 @@ export interface RenderableCell {
     lineCount: number
   }
 }
+
+/**
+ * Filled cell entry with key, coordinate, and state
+ * Used in line detection and gravity calculations
+ */
+export interface FilledCellEntry {
+  key: string
+  coord: AxialCoord
+  cellState: CellState
+}

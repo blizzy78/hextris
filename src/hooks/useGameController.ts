@@ -307,7 +307,7 @@ export function useGameController() {
       if (allAffectedCells.length > 0) {
         // Brief delay to let React render the locked piece before applying blink
         // This ensures the HexCell component detects the clearing state transition
-        await delay(16)  // One frame
+        await delay(16)  // Allow React render cycle
 
         // Show blink effect for bomb explosion
         const blinkGrid = createBombBlinkGrid(gridAfterLock, allAffectedCells)

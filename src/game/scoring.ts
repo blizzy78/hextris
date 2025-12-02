@@ -41,6 +41,24 @@ export function calculateLockScore(currentLevel: number): number {
 }
 
 /**
+ * Get the combo multiplier key for a given number of lines cleared
+ * Caps at 4 (quad or more uses same multiplier)
+ */
+type ComboMultiplierKey = 1 | 2 | 3 | 4
+function getComboKey(linesCleared: number): ComboMultiplierKey {
+  return Math.min(Math.max(linesCleared, 1), 4) as ComboMultiplierKey
+}
+
+/**
+ * Get the cascade multiplier key for a given cascade stage
+ * Caps at MAX_CASCADE_STAGE
+ */
+type CascadeMultiplierKey = 1 | 2 | 3 | 4 | 5
+function getCascadeKey(cascadeStage: number): CascadeMultiplierKey {
+  return Math.min(Math.max(cascadeStage, 1), SCORING.MAX_CASCADE_STAGE) as CascadeMultiplierKey
+}
+
+/**
  * Calculate score for lines cleared
  * @param linesCleared Number of lines cleared simultaneously
  * @param currentLevel Current game level
@@ -52,7 +70,7 @@ export function calculateScore(linesCleared: number, currentLevel: number): numb
   const basePoints = SCORING.BASE_POINTS_PER_LINE * linesCleared
 
   // Get combo multiplier (cap at 4+ lines)
-  const comboKey = Math.min(linesCleared, 4) as 1 | 2 | 3 | 4
+  const comboKey = getComboKey(linesCleared)
   const comboMultiplier = SCORING.COMBO_MULTIPLIERS[comboKey]
 
   // Apply level multiplier
@@ -81,7 +99,7 @@ export function calculateCascadeScore(
   const baseScore = calculateScore(linesCleared, currentLevel)
 
   // Get cascade multiplier (cap at MAX_CASCADE_STAGE)
-  const cascadeKey = Math.min(cascadeStage, SCORING.MAX_CASCADE_STAGE) as 1 | 2 | 3 | 4 | 5
+  const cascadeKey = getCascadeKey(cascadeStage)
   const cascadeMultiplier = SCORING.CASCADE_MULTIPLIERS[cascadeKey]
 
   // Apply multiplier cell bonus if present

@@ -70,3 +70,18 @@ export function keyToAxial(key: string): AxialCoord {
   }
   return { q: parts[0]!, r: parts[1]! }
 }
+
+/**
+ * Get the 6 hex neighbors of a coordinate
+ * Returns neighbors in order: right, left, bottom, top, bottom-right, top-left
+ */
+export function getHexNeighbors(coord: AxialCoord): AxialCoord[] {
+  return [
+    { q: coord.q + 1, r: coord.r },
+    { q: coord.q - 1, r: coord.r },
+    { q: coord.q, r: coord.r + 1 },
+    { q: coord.q, r: coord.r - 1 },
+    { q: coord.q + 1, r: coord.r - 1 },
+    { q: coord.q - 1, r: coord.r + 1 },
+  ]
+}

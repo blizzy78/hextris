@@ -1,16 +1,17 @@
 // Collision detection for hexagonal Tetris
 
-import { axialToKey } from './hexMath'
-import { getPieceCells } from './pieces'
-import type { AxialCoord, FieldShape, GridState, Piece } from './types'
+import { axialToKey } from './hexMath';
+import { getPieceCells } from './pieces';
+import type { AxialCoord, FieldShape, GridState, Piece } from './types';
 
 /**
- * Collision result with reason for failure
+ * Collision result using discriminated union
+ * When valid is true, no reason is needed
+ * When valid is false, reason explains why
  */
-interface CollisionResult {
-  valid: boolean
-  reason?: 'out-of-bounds' | 'overlap' | 'none'
-}
+type CollisionResult =
+  | { valid: true }
+  | { valid: false; reason: 'out-of-bounds' | 'overlap' }
 
 /**
  * Get all absolute axial coordinates occupied by a piece at its current position
@@ -45,5 +46,5 @@ export function isValidPiecePosition(
     }
   }
 
-  return { valid: true, reason: 'none' }
+  return { valid: true }
 }

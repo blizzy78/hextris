@@ -8,7 +8,7 @@ import {
     hasMultiplierCell,
     processFrozenCells,
 } from './specialCells'
-import type { AxialCoord, CellState, FieldShape, GridState } from './types'
+import type { AxialCoord, CellState, FieldShape, FilledCellEntry, GridState } from './types'
 
 /**
  * Get all cells that will be destroyed by bomb explosions
@@ -150,20 +150,6 @@ function clearLines(
 }
 
 /**
- * Get the 6 hex neighbors of a coordinate
- */
-function getHexNeighbors(coord: AxialCoord): AxialCoord[] {
-  return [
-    { q: coord.q + 1, r: coord.r },
-    { q: coord.q - 1, r: coord.r },
-    { q: coord.q, r: coord.r + 1 },
-    { q: coord.q, r: coord.r - 1 },
-    { q: coord.q + 1, r: coord.r - 1 },
-    { q: coord.q - 1, r: coord.r + 1 },
-  ]
-}
-
-/**
  * Determine which cells are floating vs grounded.
  *
  * A cell is grounded if:
@@ -174,8 +160,7 @@ function getHexNeighbors(coord: AxialCoord): AxialCoord[] {
  * Adjacent cells in other directions do NOT make a cell grounded.
  */
 function classifyGroundedAndFloating(
-  filledCells: Array<{ key: string; coord: AxialCoord; cellState: CellState }>,
-  _filledKeys: Set<string>,
+  filledCells: FilledCellEntry[],
   fieldShape: FieldShape
 ): { grounded: Set<string>; floating: Set<string> } {
   const grounded = new Set<string>()
@@ -223,50 +208,6 @@ function classifyGroundedAndFloating(
 }
 
 /**
- * (DEPRECATED - kept for reference)
- * Find connected components among floating cells
- * Two cells are connected if they are hex neighbors
- *
- * Note: This was used when floating masses fell as rigid units.
- * Now each floating block falls independently.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function findFloatingComponents(
-  floatingCells: Array<{ key: string; coord: AxialCoord; cellState: CellState }>
-): Array<Array<{ key: string; coord: AxialCoord; cellState: CellState }>> {
-  const floatingKeys = new Set(floatingCells.map(c => c.key))
-  const visited = new Set<string>()
-  const components: Array<Array<{ key: string; coord: AxialCoord; cellState: CellState }>> = []
-
-  for (const cell of floatingCells) {
-    if (visited.has(cell.key)) continue
-
-    // BFS to find all connected cells
-    const component: Array<{ key: string; coord: AxialCoord; cellState: CellState }> = []
-    const queue = [cell]
-    visited.add(cell.key)
-
-    while (queue.length > 0) {
-      const current = queue.shift()!
-      component.push(current)
-
-      for (const neighbor of getHexNeighbors(current.coord)) {
-        const neighborKey = axialToKey(neighbor)
-        if (floatingKeys.has(neighborKey) && !visited.has(neighborKey)) {
-          visited.add(neighborKey)
-          const neighborCell = floatingCells.find(c => c.key === neighborKey)!
-          queue.push(neighborCell)
-        }
-      }
-    }
-
-    components.push(component)
-  }
-
-  return components
-}
-
-/**
  * Apply gravity - each floating block falls independently.
  * Each block falls down one row if the target position is valid and unoccupied.
  * Blocks fall simultaneously but independently - no rigid body behavior.
@@ -276,12 +217,10 @@ export function applyGravityStep(
   fieldShape: FieldShape
 ): { grid: GridState; moved: boolean } {
   // Collect all filled cells
-  const filledCells: Array<{ key: string; coord: AxialCoord; cellState: CellState }> = []
-  const filledKeys = new Set<string>()
+  const filledCells: FilledCellEntry[] = []
   for (const [key, cellState] of grid) {
     if (cellState.filled) {
       filledCells.push({ key, coord: keyToAxial(key), cellState })
-      filledKeys.add(key)
     }
   }
 
@@ -292,7 +231,6 @@ export function applyGravityStep(
   // Classify cells as grounded or floating
   const { grounded: groundedKeys, floating: floatingKeys } = classifyGroundedAndFloating(
     filledCells,
-    filledKeys,
     fieldShape
   )
 

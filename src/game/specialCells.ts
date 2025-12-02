@@ -1,6 +1,6 @@
 // Special cell spawning and behavior logic
 
-import { axialToKey } from './hexMath'
+import { axialToKey, getHexNeighbors } from './hexMath'
 import type { AxialCoord, FieldShape, GridState, SpecialCellType } from './types'
 
 /**
@@ -57,20 +57,6 @@ export const SPECIAL_CELL_SPAWN = {
   /** Maximum multiplier piece spawn chance */
   MULTIPLIER_PIECE_MAX_CHANCE: 0.06,
 } as const
-
-/**
- * Get the 6 hex neighbors of a coordinate
- */
-function getHexNeighbors(coord: AxialCoord): AxialCoord[] {
-  return [
-    { q: coord.q + 1, r: coord.r },
-    { q: coord.q - 1, r: coord.r },
-    { q: coord.q, r: coord.r + 1 },
-    { q: coord.q, r: coord.r - 1 },
-    { q: coord.q + 1, r: coord.r - 1 },
-    { q: coord.q - 1, r: coord.r + 1 },
-  ]
-}
 
 /**
  * Calculate spawn chance for a special cell type at a given level
