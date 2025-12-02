@@ -2,7 +2,7 @@
 
 import { CELL_SIZES, COLORS, getSpecialCellColor, PADDING, SPECIAL_CELL_VISUALS } from '@/game/renderConstants'
 import type { SpecialCellType } from '@/game/types'
-import { HexCell } from './HexCell'
+import { HexCell, SpecialCellGlow } from './HexCell'
 
 interface SpecialBlockInfo {
   type: SpecialCellType
@@ -58,6 +58,11 @@ export function SpecialBlockShowcase() {
                 color={getSpecialCellColor(block.type) ?? COLORS.CELL_STROKE}
                 stroke={COLORS.CELL_STROKE}
                 strokeWidth={1}
+                special={block.type}
+              />
+              <SpecialCellGlow
+                coord={{ q: 0, r: 0 }}
+                size={cellSize}
                 special={block.type}
               />
             </svg>

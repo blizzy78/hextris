@@ -1,7 +1,6 @@
 // ScoreDisplay component - shows game stats
 
 import { useHighScoreStore } from '@/stores/highScoreStore'
-import { memo } from 'react'
 
 interface ScoreDisplayProps {
   score: number
@@ -9,7 +8,7 @@ interface ScoreDisplayProps {
   linesCleared: number
 }
 
-const ScoreDisplayComponent = ({ score, level, linesCleared }: ScoreDisplayProps) => {
+export const ScoreDisplay = ({ score, level, linesCleared }: ScoreDisplayProps) => {
   const highScore = useHighScoreStore((state) => state.getHighScore())
   const isNewHighScore = score > highScore
 
@@ -44,5 +43,3 @@ const ScoreDisplayComponent = ({ score, level, linesCleared }: ScoreDisplayProps
     </div>
   )
 }
-
-export const ScoreDisplay = memo(ScoreDisplayComponent)

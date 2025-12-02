@@ -4,7 +4,7 @@ import { FIELD_COORDS, FIELD_SHAPE } from '@/game/gameModes'
 import { axialToKey, axialToPixel } from '@/game/hexMath'
 import { PADDING } from '@/game/renderConstants'
 import type { AxialCoord, FieldShape, RenderableCell } from '@/game/types'
-import { HexCell } from './HexCell'
+import { HexCell, SpecialCellGlow } from './HexCell'
 
 interface HexGridProps {
   cells: RenderableCell[]
@@ -165,6 +165,20 @@ export function HexGrid({ cells, size, padding = PADDING.DEFAULT_GRID }: HexGrid
           clearing={cell.clearing}
         />
       ))}
+
+      {/* Special cell glow effects rendered on top of all cells */}
+      {cells
+        .filter((cell) => cell.special && !cell.isGhost && !cell.clearing)
+        .map((cell, index) => (
+          <SpecialCellGlow
+            key={`glow-${cell.coord.q},${cell.coord.r}-${index}`}
+            coord={cell.coord}
+            size={size}
+            special={cell.special!}
+            frozenCleared={cell.frozenCleared}
+            clearing={cell.clearing}
+          />
+        ))}
     </svg>
   )
 }
