@@ -268,14 +268,16 @@ const HexCellComponent = ({
     if (clearing && !wasClearing.current) {
       wasClearing.current = true
       const startTime = performance.now()
-      const duration = GLOW.ANIMATION_DURATION
+      // Duration scales with line count: more lines = longer animation
+      const duration = GLOW.BASE_DURATION + (clearing.lineCount - 1) * GLOW.DURATION_PER_LINE
 
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime
         const progress = Math.min(elapsed / duration, 1)
-        // Ease-out curve for smooth animation
-        const eased = 1 - Math.pow(1 - progress, 3)
-        setGlowIntensity(eased)
+
+        // Simple ease-out curve for smooth fade to white
+        const intensity = 1 - Math.pow(1 - progress, 3)
+        setGlowIntensity(intensity)
 
         if (progress < 1) {
           animationRef.current = requestAnimationFrame(animate)
@@ -333,7 +335,12 @@ const HexCellComponent = ({
   const specialGlow = getSpecialCellGlow(special, frozenCleared)
 
   // Determine actual fill color - special cells use their glow color
-  const fillColor = specialGlow ? specialGlow.color : color
+  let fillColor = specialGlow ? specialGlow.color : color
+
+  // When clearing, smoothly fade the color toward white
+  if (clearing && glowIntensity > 0) {
+    fillColor = lightenColor(fillColor, glowIntensity * 0.85)
+  }
 
   // Facet colors - simulate light from top-left
   // Each facet gets different shading based on its angle
@@ -396,6 +403,23 @@ const HexCellComponent = ({
             filter={`url(#${clearingInnerBlurId})`}
             opacity={currentGlowOpacity * GLOW.INNER_OPACITY_MULT}
           />
+          {/* Golden warmth overlay for 3+ line clears */}
+          {lineCount >= 3 && (
+            <>
+              <polygon
+                points={points}
+                fill={COLORS.GOLD_OVERLAY}
+                filter={`url(#${clearingOuterBlurId})`}
+                opacity={currentGlowOpacity * GLOW.OUTER_OPACITY_MULT * GLOW.GOLD_OVERLAY_OPACITY}
+              />
+              <polygon
+                points={points}
+                fill={COLORS.GOLD_OVERLAY}
+                filter={`url(#${clearingInnerBlurId})`}
+                opacity={currentGlowOpacity * GLOW.INNER_OPACITY_MULT * GLOW.GOLD_OVERLAY_OPACITY}
+              />
+            </>
+          )}
         </>
       )}
 

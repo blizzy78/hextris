@@ -1,10 +1,10 @@
+import { createBlinkGrid, createBombBlinkGrid } from '@/game/animationHelpers'
 import { FIELD_SHAPE } from '@/game/gameModes'
 import { axialToKey } from '@/game/hexMath'
-import type { Line, LineClearStage } from '@/game/lineDetection'
+import type { LineClearStage } from '@/game/lineDetection'
 import { detectLinesForAnimation, getGravityFrames } from '@/game/lineDetection'
 import { hardDrop, moveDown, moveDownLeft, moveDownRight, moveLeft, moveRight, rotateWithWallKick } from '@/game/movement'
 import { getPieceCells } from '@/game/pieces'
-import { COLORS } from '@/game/renderConstants'
 import { calculateCascadeScore, calculateLevel, calculateLockScore, calculateSpeed } from '@/game/scoring'
 import { applyBombExplosions, getFilledNeighbors, maybeSpawnSpecialCell } from '@/game/specialCells'
 import type { AxialCoord, GridState, Piece } from '@/game/types'
@@ -40,49 +40,9 @@ async function animateGravityFrames(frames: GridState[]): Promise<void> {
   }
 }
 
-/**
- * Apply blink effect to cells being cleared
- */
-function createBlinkGrid(baseGrid: GridState, lines: Line[]): GridState {
-  const blinkGrid = new Map(baseGrid)
-  const blinkCells = lines.flatMap((line: Line) => line.cells)
-  const lineCount = lines.length
 
-  for (const cell of blinkCells) {
-    const key = axialToKey(cell)
-    const cellState = blinkGrid.get(key)
-    if (cellState?.filled) {
-      blinkGrid.set(key, {
-        filled: true,
-        color: COLORS.FLASH_WHITE,
-        clearing: { lineCount },
-      })
-    }
-  }
 
-  return blinkGrid
-}
 
-/**
- * Apply blink effect to cells destroyed by bomb explosions
- */
-function createBombBlinkGrid(baseGrid: GridState, bombCells: AxialCoord[]): GridState {
-  const blinkGrid = new Map(baseGrid)
-
-  for (const cell of bombCells) {
-    const key = axialToKey(cell)
-    const cellState = blinkGrid.get(key)
-    if (cellState?.filled) {
-      blinkGrid.set(key, {
-        filled: true,
-        color: COLORS.FLASH_WHITE,  // White flash like line clears
-        clearing: { lineCount: 1 },
-      })
-    }
-  }
-
-  return blinkGrid
-}
 
 /**
  * Process a single line-clearing stage with animation
@@ -91,10 +51,10 @@ async function processLineClearStage(
   stage: LineClearStage,
   previousGridAfterGravity: GridState | null
 ): Promise<void> {
-  // Get base grid for blink effect
+  // Get base grid for clearing animation
   const currentGrid = previousGridAfterGravity ?? useGameStore.getState().grid
 
-  // Show blink effect for line clear
+  // Show fade to white animation for line clear
   const blinkGrid = createBlinkGrid(currentGrid, stage.lines)
   useGameStore.setState({ grid: blinkGrid })
   await delay(ANIMATION_TIMING.BLINK_DURATION)

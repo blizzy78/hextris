@@ -1,7 +1,6 @@
 // HexGrid component - renders a collection of hexagons
 
-import { FIELD_COORDS, FIELD_SHAPE } from '@/game/gameModes'
-import { axialToKey, axialToPixel } from '@/game/hexMath'
+import { axialToKey, axialToPixel, keyToAxial } from '@/game/hexMath'
 import { PADDING } from '@/game/renderConstants'
 import type { AxialCoord, FieldShape, RenderableCell } from '@/game/types'
 import { HexCell, SpecialCellGlow } from './HexCell'
@@ -106,13 +105,16 @@ function shouldSkipBoundaryEdge(edgeIndex: number, boundaryEdges: number[]): boo
   return false
 }
 
-export function HexGrid({ cells, size, padding = PADDING.DEFAULT_GRID }: HexGridProps) {
-  const bounds = calculateBounds(FIELD_COORDS, size, padding)
+export function HexGrid({ cells, fieldShape, size, padding = PADDING.DEFAULT_GRID }: HexGridProps) {
+  // Convert fieldShape to coordinates
+  const fieldCoords = Array.from(fieldShape).map(key => keyToAxial(key))
+
+  const bounds = calculateBounds(fieldCoords, size, padding)
 
   // Pre-compute boundary edges for emphasized rendering
   const boundaryLines: { x1: number; y1: number; x2: number; y2: number; key: string }[] = []
-  for (const coord of FIELD_COORDS) {
-    const boundaryEdges = getBoundaryEdges(coord, FIELD_SHAPE)
+  for (const coord of fieldCoords) {
+    const boundaryEdges = getBoundaryEdges(coord, fieldShape)
     const { x, y } = axialToPixel(coord, size)
 
     for (const edgeIndex of boundaryEdges) {

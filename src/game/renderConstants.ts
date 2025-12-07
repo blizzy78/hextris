@@ -12,6 +12,8 @@ export const COLORS = {
   CLEARING_GLOW: '#ffffff',
   /** White flash color for animations */
   FLASH_WHITE: '#ffffff',
+  /** Golden warmth overlay for multiple line clears */
+  GOLD_OVERLAY: 'rgba(255, 215, 0, 1)',
 } as const
 
 /**
@@ -70,8 +72,10 @@ export const SHADOW = {
  * Glow effect constants for line clearing animation
  */
 export const GLOW = {
-  /** Animation duration for glow fade-in (ms) */
-  ANIMATION_DURATION: 150,
+  /** Base animation duration for glow (ms) */
+  BASE_DURATION: 150,
+  /** Additional duration per extra line cleared (ms) */
+  DURATION_PER_LINE: 30,
   /** Base glow radius for single line clear */
   BASE_RADIUS: 4,
   /** Additional glow radius per extra line cleared */
@@ -92,6 +96,12 @@ export const GLOW = {
   INNER_OPACITY_MULT: 0.8,
   /** Blur multiplier for inner glow layer */
   INNER_BLUR_MULT: 0.5,
+  /** Base pulse period for sine wave modulation (ms) */
+  BASE_PULSE_PERIOD: 800,
+  /** Elastic overshoot amount (multiplier beyond 1.0) */
+  ELASTIC_OVERSHOOT: 1.2,
+  /** Golden warmth overlay opacity for 3+ lines */
+  GOLD_OVERLAY_OPACITY: 0.25,
 } as const
 
 /**
