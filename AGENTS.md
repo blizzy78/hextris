@@ -1,253 +1,200 @@
 # AGENTS.md
 
-Hexagonal Tetris game built with React 19, Vite, Zustand, and TanStack Router.
+Hexagonal Tetris. React 19, Vite, Zustand, TanStack Router.
 
-## Architecture Overview
+## Commands
+
+**⚠️ NEVER run `pnpm dev` or `pnpm preview`** — blocking servers hang indefinitely.
+
+```bash
+pnpm build              # Lint + TypeScript + Vite build
+pnpm lint               # ESLint only
+pnpm test               # Run tests
+pnpm test:watch         # Watch mode
+pnpm generate-routes    # TanStack Router generation
+```
+
+## Architecture
 
 ```
 src/
-├── game/           # Pure game logic (no React)
-├── stores/         # Zustand state stores
-├── hooks/          # React hooks
-├── components/     # React UI components
-└── routes/         # TanStack Router pages
+├── game/        # Pure logic (no React)
+├── stores/      # Zustand state
+├── hooks/       # React bridges
+├── components/  # UI (rendering only)
+└── routes/      # TanStack Router (imports from components/)
 ```
 
-### Core Layers
+**Strict separation**: Pure logic in `game/`, state in `stores/`, orchestration in hooks, rendering in components. Routes import page components, never contain logic.
 
-**Game Logic (`src/game/`)** — Pure TypeScript functions, no side effects. Handles hexagonal math, collision detection, line clearing, piece rotation, movement, scoring, and special cells. All functions take state as input, return new state.
+## Style
 
-**State Stores (`src/stores/`)** — Zustand stores manage all game state. Three stores with distinct responsibilities:
-- `gameStore.ts` — Core game state (grid, current piece, score, level, status, lock delay state)
-- `highScoreStore.ts` — Persistent high score via Zustand persist middleware (localStorage key: `hextris-highscores`)
-- `gameLoopStore.ts` — Game timing state (elapsed time tracking for external use)
+See `.github/copilot-instructions.md` for full patterns:
+- No `useEffect` for derived state or event handling
+- Use `useEffectEvent` for non-reactive callbacks in Effects
+- Global Zustand stores (not factories)
+- Selective store subscriptions
+- Pure functions in `game/` (state in, state out)
+- Event-driven updates (not effects)
 
-**Hooks (`src/hooks/`)** — React bridges:
-- `useGameController.ts` — Game orchestration (movement, input, game loop, line clearing, special cells, lock delay, high score)
-- `useGameLoop.ts` — requestAnimationFrame loop for auto-drop timing and lock delay expiration
-- `useKeyboard.ts` — Keyboard input with debouncing (uses `useEffectEvent` for non-reactive callbacks)
+Examples:
+- Pure logic: `src/game/movement.ts`, `src/game/scoring.ts`
+- Store pattern: `src/stores/gameStore.ts`
+- Controller hook: `src/hooks/useGameController.ts`
+- Component: `src/components/GamePage.tsx`
 
-**Routes (`src/routes/`)** — Route definition only. No components, no logic. Routes import page components from `components/`.
+## Hexagonal Grid
 
-**Components (`src/components/`)** — Pure rendering, minimal logic:
-- `GamePage.tsx` — Main game page layout, composes other components, consumes `useGameController`
-- `GameBoard.tsx` — Main grid display with ghost piece preview
-- `HexGrid.tsx` / `HexCell.tsx` — Hexagonal cell rendering with special cell glow effects
-- `NextPiece.tsx` — Next piece preview display
-- `ScoreDisplay.tsx` — Score/level/lines UI
-- `GameOverModal.tsx` — Game over overlay with restart and high score display
-- `PieceShowcase.tsx` — All piece shapes display (shown on idle screen)
-- `SpecialBlockShowcase.tsx` — Special block types display with pulsing animations
+Axial coordinates `(q, r)` primary. Functions in `src/game/hexMath.ts`:
+- `axialToPixel` — Screen positioning (flat-top)
+- `axialToCube` / `cubeToAxial` — Rotation math
+- `axialToKey` / `keyToAxial` — Map serialization
 
-### Hexagonal Coordinate System
+Grid: `Map<string, CellState>` with `"q,r"` keys
+Field: 11 columns × 20 rows, spawn at `(5, -2)`
 
-Uses **axial coordinates** (q, r) as primary system. Key conversions in `hexMath.ts`:
-- `axialToPixel` — Position hexes on screen (flat-top orientation)
-- `axialToCube` / `cubeToAxial` — For rotation math (constraint: x + y + z = 0)
-- `axialToKey` / `keyToAxial` — String serialization for Map keys
+## Game Systems
 
-Grid cells stored in `Map<string, CellState>` with keys in `"q,r"` format.
+### Pieces (`src/game/pieces.ts`)
 
-**Field dimensions**: 11 columns × 20 rows rectangular grid. Spawn position at top center (q=5, r=-2).
+10 tetrahex pieces in `PIECE_METADATA`:
+- `I_PIECE`, `S_PIECE`, `Z_PIECE`, `L_PIECE`, `J_PIECE`
+- `T_PIECE`, `P_PIECE`, `U_PIECE`, `O_PIECE`, `Y_PIECE`
 
-### Piece System
+Metadata: `shape`, `color`, `name`, `hasCenter`, `rotationStates`
+- Symmetric (I/S/Z/O): 3 rotation states
+- Asymmetric: 6 rotation states
+- U_PIECE: `hasCenter: false` (orbits empty center)
 
-10 tetrahex pieces defined in `pieces.ts`. Each piece has metadata in `PIECE_METADATA`:
-- `shape: PieceShape` — Offsets from origin (center at 0,0)
-- `hasCenter: boolean` — Whether origin cell is filled (U_PIECE has false, orbits around center)
-- `rotationStates: number` — 3 for symmetric pieces (I, S, Z, O), 6 for asymmetric
-- `color: string` — Piece color
-- `name: string` — Display name
+Rotation via cube math with wall kicks.
 
-Piece types: `I_PIECE`, `S_PIECE`, `Z_PIECE`, `L_PIECE`, `J_PIECE`, `T_PIECE`, `P_PIECE`, `U_PIECE`, `O_PIECE`, `Y_PIECE`
+### Movement (`src/game/movement.ts`)
 
-Rotation uses cube coordinate math: convert to cube, cycle coordinates, convert back. Wall kicks attempt neighbor offsets when rotation would cause collision.
+Functions: `moveLeft`, `moveRight`, `moveDown`, `hardDrop`
 
-### Line Detection
+Lock delay (500ms): enables tucking under overhangs
+- Triggers when piece can't move down
+- Left/right become diagonal down-left/down-right
+- Any movement resets timer
+- Cancel if piece can move down again
+- Hard drop bypasses entirely
 
-Two clearable directions in `lineDetection.ts`:
-- `diagonalRight` — Constant r value
-- `diagonalLeft` — Constant q+r value
+State: `isLocking`, `lockStartTime` in `gameStore.ts`
 
-After clearing, gravity is applied in discrete animation frames. Line clear animation sequence:
-1. Blink effect (cells turn white, 200ms)
+### Lines (`src/game/lineDetection.ts`)
+
+Two clearable directions:
+- `diagonalRight` — constant `r`
+- `diagonalLeft` — constant `q+r`
+
+Animation sequence:
+1. Blink (200ms)
 2. Clear delay (150ms)
-3. Bomb explosions (if any bombs in cleared lines): blink + clear (200ms + 150ms)
+3. Bomb explosions if present (200ms + 150ms)
 4. Gravity frames (100ms each)
-5. Stage delay between multi-stage clears (100ms)
+5. Stage delay for cascades (100ms)
 
-### Special Cells System
+### Special Cells (`src/game/specialCells.ts`)
 
-Defined in `specialCells.ts`. Three special cell types with visual effects in `renderConstants.ts`:
+| Type | Effect | Spawn |
+|------|--------|-------|
+| Bomb | Clear adjacent on line clear | 5% + 0.5%/level (max 15%), cap 3 |
+| Multiplier | 2× line score | 3% + 0.4%/level (max 12%), cap 3 |
+| Frozen | Two clears needed | Fixed 2.5%, cap 1 |
 
-| Type | Color | Effect | Spawn Rate |
-|------|-------|--------|------------|
-| Bomb | Red (#ff4444) | Clears all adjacent filled cells when cleared | 5% base + 0.5%/level (max 15%) |
-| Multiplier | Gold (#ffd700) | 2× score for lines containing it | 3% base + 0.4%/level (max 12%) |
-| Frozen | Ice Blue (#88ddff) | Requires two clears to remove | Fixed 2.5% |
+Special pieces: Bomb (2% base, max 8%), Multiplier (1.5% base, max 6%)
+Spawn timing: After gravity cycles
 
-**Maximum counts on field**: Bomb: 3, Multiplier: 3, Frozen: 1
+### Scoring (`src/game/scoring.ts`)
 
-**Special Pieces**: Entire pieces can spawn as bomb (2% base, max 8%) or multiplier (1.5% base, max 6%). All cells inherit the special type when locked.
+- Lock: `10 × level`
+- Line clear: `100 × lines × combo × level × cascade × special`
+- Combos: 1/3/5/8 (single/double/triple/quad+)
+- Cascades: 1/1.5/2/2.5/3 (initial/1st/2nd/3rd/4th+)
+- Special: 2× if multiplier cell in line
+- Level: +1 per 10 lines (max 20)
+- Speed: 1000ms at L1, -50ms/level (min 100ms)
 
-**Spawn timing**: Special cells spawn on existing locked cells after each gravity cycle (after piece lock or cascade clear).
+### Controls (`src/hooks/useKeyboard.ts`)
 
-### Lock Delay & Tucking
+- Arrow Left/Right: Move (50ms debounce), diagonal during lock delay
+- Arrow Down: Soft drop (50ms debounce)
+- Arrow Up: Rotate (50ms debounce)
+- Space: Hard drop (300ms debounce)
+- Any key: Start game (idle only)
 
-Lock delay (500ms) allows player to slide pieces under overhangs before locking:
-- When piece lands (can't move down), lock delay starts
-- During lock delay, left/right movement uses diagonal down-left/down-right instead of horizontal
-- Any successful movement resets the lock delay timer
-- If piece can move down again (via rotation/movement), lock delay cancels
-- Hard drop bypasses lock delay entirely
+## State Management
 
-State tracked in `gameStore.ts`: `isLocking`, `lockStartTime`
+Three stores:
+1. `gameStore.ts` — Game state (grid, piece, score, level, lock delay)
+2. `highScoreStore.ts` — Persistent via localStorage (`hextris-highscores`)
+3. `gameLoopStore.ts` — Timing (elapsed tracking)
 
-### Scoring System
-
-Defined in `scoring.ts`:
-- **Lock points**: 10 × level (awarded when piece locks)
-- **Line clear**: 100 × lines × combo multiplier × level × cascade multiplier × special multiplier
-- **Combo multipliers**: 1 (single), 3 (double), 5 (triple), 8 (quad+)
-- **Cascade multipliers**: 1 (initial), 1.5 (1st cascade), 2 (2nd), 2.5 (3rd), 3 (4th+)
-- **Special multiplier**: 2× if any multiplier cell in cleared line
-- **Level progression**: Level up every 10 lines, max level 20
-- **Speed**: 1000ms at level 1, decreases 50ms per level, minimum 100ms
-
-### Controls
-
-Keyboard input handled in `useKeyboard.ts` with debouncing:
-- **Arrow Left/Right** — Move horizontally (50ms debounce), diagonal during lock delay
-- **Arrow Down** — Soft drop (50ms debounce)
-- **Arrow Up** — Rotate clockwise (50ms debounce)
-- **Space** — Hard drop (300ms debounce)
-- **Any key** — Start game (when idle)
-
-## Development Workflow
-
-**⚠️ NEVER run `pnpm dev` or `pnpm preview`** — these commands start blocking servers that will hang the terminal indefinitely. Use `pnpm build` and `pnpm lint` for validation.
-
-```bash
-pnpm build        # Lint + TypeScript check + Vite build
-pnpm lint         # ESLint
-```
-
-Route generation:
-```bash
-pnpm generate-routes   # One-time route generation
-pnpm watch-routes      # Watch mode for routes
-```
-
-## Code Patterns
-
-### State Management
-
-Follow global store pattern, not factory pattern:
-
+Pattern:
 ```typescript
-// ✅ Single global store
-export const useGameStore = create<GameStore>((set, get) => ({
-  score: 0,
-  updateScore: (points) => set((state) => ({ score: state.score + points }))
-}))
+// Global store
+export const useGameStore = create<GameStore>((set, get) => ({ /* ... */ }))
 
-// Use selective subscriptions
+// Selective subscription
 const score = useGameStore((state) => state.score)
 ```
 
-### Derived State
+## Flow
 
-Calculate during render, not in effects:
-
-```typescript
-// ✅ Derived during render
-const cells = useMemo(() => {
-  const result = []
-  for (const [key, cellState] of grid) {
-    if (cellState.filled) result.push({ coord: keyToAxial(key), color: cellState.color })
-  }
-  return result
-}, [grid])
-```
-
-### Pure Game Functions
-
-Game logic functions take state, return new state:
-
-```typescript
-// ✅ Pure function pattern
-export function moveDown(piece: Piece, grid: GridState, fieldShape: FieldShape): Piece | null {
-  const newPiece = { ...piece, position: { q: piece.position.q, r: piece.position.r + 1 } }
-  return isValidPiecePosition(newPiece, grid, fieldShape).valid ? newPiece : null
-}
-```
-
-### Event-Driven Updates
-
-Handle in event handlers, not effects:
-
-```typescript
-// ✅ Score update in event handler
-function handleDrop() {
-  lockPiece(currentPiece)
-  const points = calculateLockScore(level)
-  updateScore(points)  // Immediate, not via effect
-}
-```
+1. `useGameLoop` → requestAnimationFrame → `onDrop` at speed interval
+2. `handleDrop` → move down or lock
+3. Lock → update grid → detect lines → animate → spawn next
+4. Spawn fail → game over → check high score
 
 ## Key Files
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
-| `src/game/types.ts` | All type definitions |
-| `src/game/hexMath.ts` | Coordinate conversions |
-| `src/game/pieces.ts` | Piece shapes, metadata, and rotation |
+| `src/game/types.ts` | All types |
+| `src/game/hexMath.ts` | Coordinate system |
+| `src/game/pieces.ts` | Piece data + rotation |
+| `src/game/movement.ts` | Movement + wall kicks |
 | `src/game/collision.ts` | Collision detection |
-| `src/game/movement.ts` | Piece movement (left/right/down/hardDrop) and wall kicks |
-| `src/game/lineDetection.ts` | Line clearing and gravity logic |
-| `src/game/scoring.ts` | Score calculation and level progression |
-| `src/game/specialCells.ts` | Special cell spawning, effects, and constants |
-| `src/game/renderConstants.ts` | Visual constants (colors, sizes, glow effects) |
-| `src/game/gameModes.ts` | Field shape and spawn position constants |
-| `src/stores/gameStore.ts` | Main game state |
-| `src/stores/highScoreStore.ts` | Persistent high score with localStorage |
-| `src/hooks/useGameController.ts` | Game orchestration, input handling, game loop |
-| `src/hooks/useKeyboard.ts` | Keyboard input with debouncing |
-| `src/hooks/useGameLoop.ts` | requestAnimationFrame-based auto-drop and lock delay |
-| `src/components/GamePage.tsx` | Main game page component |
-| `src/routes/index.tsx` | Route definition (imports GamePage) |
-
-## Integration Points
-
-**Game Loop Flow**:
-1. `useGameLoop` runs requestAnimationFrame, calls `onDrop` when speed interval elapsed
-2. `handleDrop` in `useGameController` moves piece down or locks if blocked
-3. On lock: update grid, detect lines, animate clears, spawn next piece
-4. On spawn failure: game over, update high score if applicable
-
-**Store Communication**:
-- `useGameController` reads from all three stores
-- `gameStore.startGame()` resets `gameLoopStore.elapsed` via direct `getState()` call
-- `highScoreStore` persists automatically via Zustand persist middleware
-
-## External Dependencies
-
-- [Zustand v5](https://zustand.docs.pmnd.rs/) — State management
-- [TanStack Router](https://tanstack.com/router) — File-based routing
-- [Tailwind CSS v4](https://tailwindcss.com/docs) — Styling
-- [Vite](https://vite.dev/) — Build tooling
+| `src/game/lineDetection.ts` | Line clearing + gravity |
+| `src/game/scoring.ts` | Score calculation |
+| `src/game/specialCells.ts` | Special cell logic |
+| `src/stores/gameStore.ts` | Main state |
+| `src/stores/highScoreStore.ts` | Persistent high score |
+| `src/hooks/useGameController.ts` | Game orchestration |
+| `src/hooks/useGameLoop.ts` | Auto-drop + lock delay |
+| `src/hooks/useKeyboard.ts` | Input handling |
+| `src/components/GamePage.tsx` | Main page |
 
 ## Conventions
 
-- Path alias `@/` maps to `src/`
-- Types in `types.ts`, not co-located
-- Game logic pure, stores handle side effects
-- Components subscribe selectively to stores
-- No useEffect for derived state or event handling
-- Use `useEffectEvent` for callbacks inside Effects that need latest values without triggering re-runs
-- **Route files must be simple** — rendering and layout only, no business logic. Extract orchestration to controller hooks (`useGameController`), game logic to `game/`, state to stores. Page components go in `components/`, routes only import and render them
-- See `.github/copilot-instructions.md` for React/Zustand patterns
+- Path alias: `@/` → `src/`
+- Types in `types.ts` (not co-located)
+- Pure functions in `game/`
+- Selective store subscriptions
+- No `useEffect` for derived state
+- Route files: imports only, no logic
 
-## Adding New Features
+## Dependencies
 
-**New piece type**: Add to `PIECE_METADATA` in `pieces.ts`, include shape offsets, color, name, hasCenter, and rotationStates.
+- [Zustand v5](https://zustand.docs.pmnd.rs/)
+- [TanStack Router](https://tanstack.com/router)
+- [Tailwind CSS v4](https://tailwindcss.com/docs)
+- [Vite](https://vite.dev/)
+
+## Boundaries
+
+Never:
+- Run `pnpm dev` or `pnpm preview`
+- Put logic in route files
+- Use `useEffect` for derived state
+- Create store factories (use global stores)
+
+Always:
+- Pure functions in `game/`
+- Orchestration in hooks
+- Rendering in components
+- Follow `.github/copilot-instructions.md`
+
+## Adding Features
+
+New piece: Add to `PIECE_METADATA` in `src/game/pieces.ts` with `shape`, `color`, `name`, `hasCenter`, `rotationStates`.
