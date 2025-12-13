@@ -25,3 +25,4 @@ dist-ssr
 
 .tanstack
 *.docker.tar
+build-and-deploy.sh

@@ -34,8 +34,8 @@ export function GameOverModal({
       <div className={`bg-gray-900 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl ${modalBorderClasses}`}>
         {showHighScoreCelebration ? (
           <>
-            <div className="text-center mb-2">
-              <span className="text-4xl">🏆</span>
+            <div className="text-center mb-5">
+              <span className="text-6xl">🏆</span>
             </div>
             <h2 id="game-over-title" className="text-3xl font-bold text-yellow-400 mb-2 text-center">
               New High Score!
